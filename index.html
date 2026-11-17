@@ -2340,7 +2340,7 @@ body.hist-mode #history-panel {
       <div class="hdr-emblem">🎱</div>
       <div style="flex:1">
         <div class="hdr-name"><span>Curran&rsquo;s Shot Reader</span></div>
-        <div class="hdr-sub">See the table. Read the shot. <span style="color:var(--gold-dim);opacity:.7">· V11.17.1220</span></div>
+        <div class="hdr-sub">See the table. Read the shot. <span style="color:var(--gold-dim);opacity:.7">· V11.17.0137</span></div>
       </div>
       <div style="flex:1 1 100%;display:flex;gap:6px;justify-content:flex-end;margin-top:7px">
         <button class="help-btn" id="hdr-tour-btn" onclick="showWelcome()" title="Welcome tour"><span style="font-size:14px">👋</span> Tour</button>
@@ -3416,10 +3416,18 @@ async function runDetection() {
     }
     // ───────────────────────────────────────────────────────────────────
 
+    window._notBalls = 0;
     detections.forEach(det => {
       const [x, y, w, h] = det.bbox;
       const fx = (x + w / 2) / W;
       const fy = (y + h / 2) / H;
+      /* A pool ball is round and small. MEASURED on a real photo: the model
+         returned a 1888x1034 box - nearly the whole picture - around a cue
+         stick lying on red cloth, and the app then planned a shot at it.
+         Partly hidden balls measured up to 1.41:1, so 1.6 leaves room for
+         those; the size cap is far beyond any ball, even in a close-up. */
+      const asp = w / h;
+      if (asp > 1.6 || asp < 1 / 1.6 || Math.min(w, h) > 0.45 * Math.min(W, H)) { window._notBalls++; return; }
 
       const tooClose = marks.some(m => Math.hypot(m.fx - fx, m.fy - fy) < 0.04);
       if (tooClose) return;
@@ -3535,6 +3543,84 @@ async function runDetection() {
           window._cueGuardWhy = 'nothing to check';
         }
       }
+      /* ── TWO CUE BALLS ────────────────────────────────────────────────
+         MEASURED on a real photo: a striped ball half hidden behind the
+         player's hand showed only its white half, and the model called it a
+         second cue ball. The real cue ball is evenly white AND round; a
+         half-hidden stripe is neither. Keep the clear winner and hand the
+         rest back as stripes. Too close to call: leave it, and the
+         "More Than One Cue Ball" prompt asks the player as before. */
+      window._cueTrimmed = 0;
+      {
+        const cues = marks.filter(m => m.aiDetected && m.type === 'cue');
+        if (cues.length >= 2) {
+          const sc = m => {
+            const a = (m._bw * W) / Math.max(1e-6, m._bh * H);
+            const round = 1 - Math.min(1, Math.abs(Math.log(a)) / Math.log(1.6));
+            return (m._white || 0) * 0.7 + round * 0.3;
+          };
+          const ranked = cues.slice().sort((a, b) => sc(b) - sc(a));
+          const best = ranked[0];
+          if ((best._white || 0) >= CUE_MIN_WHITE && best._sat <= CUE_MAX_SAT && sc(best) - sc(ranked[1]) >= 0.08) {
+            ranked.slice(1).forEach(m => { m.type = 'stripe'; m.className = 'stripe'; window._cueTrimmed++; });
+          }
+        }
+      }
+
+      /* ── A RACK, READ FROM THE PICTURE ─────────────────────────────────
+         The model finds balls one at a time and misses most of a tight rack:
+         MEASURED, 2 of 15 found in a racked photo, so the ball-count test
+         below could never say "break first". A rack is unmistakable in the
+         picture itself, though: one compact patch that is not cloth, ten or
+         more balls' worth in area, surrounded by cloth on every side. Each
+         detected ball is a seed; flood the not-cloth region it sits in and
+         measure it. Reaching the edge of the search window means it runs into
+         a rail or a pocket, which is not a rack. */
+      try {
+        sourceImg._racked = false;
+        const seeds = marks.filter(m => m.aiDetected && typeof m._bw === 'number');
+        if (seeds.length) {
+          const G = 4, N = 160, d = inferCtx.getImageData(0, 0, 640, 640).data;
+          const Hc = new Float32Array(N * N), Sc = new Float32Array(N * N), Vc = new Float32Array(N * N);
+          const hist = new Array(36).fill(0);
+          for (let gy = 0; gy < N; gy++) for (let gx = 0; gx < N; gx++) {
+            const i = ((gy * G + 2) * 640 + gx * G + 2) * 4, r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255;
+            const mx = Math.max(r, g, b), mn = Math.min(r, g, b), df = mx - mn;
+            let h = 0;
+            if (df > 0) h = mx === r ? 60 * (((g - b) / df) % 6) : mx === g ? 60 * ((b - r) / df + 2) : 60 * ((r - g) / df + 4);
+            if (h < 0) h += 360;
+            const k = gy * N + gx; Hc[k] = h; Sc[k] = mx ? df / mx : 0; Vc[k] = mx;
+            if (Sc[k] > 0.25 && mx > 0.15) hist[Math.min(35, Math.floor(h / 10))]++;
+          }
+          let fb = 0; for (let k = 1; k < 36; k++) if (hist[k] > hist[fb]) fb = k;
+          const feltHue = fb * 10 + 5;
+          const isFelt = k => { const dh = Math.abs(Hc[k] - feltHue), hd = Math.min(dh, 360 - dh); return Sc[k] > 0.18 && Vc[k] > 0.06 && hd < 22; };
+          const seen = new Uint8Array(N * N);
+          for (const m of seeds) {
+            const cx = Math.round(((m.fx - _cropFx) / _cropFw) * 640 / G), cy = Math.round(((m.fy - _cropFy) / _cropFh) * 640 / G);
+            const rx = Math.max(1, (m._bw / _cropFw) * 640 / 2 / G), ry = Math.max(1, (m._bh / _cropFh) * 640 / 2 / G);
+            let start = -1;
+            for (let oy = -1; oy <= 1 && start < 0; oy++) for (let ox = -1; ox <= 1 && start < 0; ox++) {
+              const x = cx + ox, y = cy + oy; if (x < 0 || y < 0 || x >= N || y >= N) continue;
+              const k = y * N + x; if (!isFelt(k) && !seen[k]) start = k;
+            }
+            if (start < 0) continue;
+            const wx0 = cx - 14 * rx, wx1 = cx + 14 * rx, wy0 = cy - 14 * ry, wy1 = cy + 14 * ry;
+            let area = 0, enclosed = true, bx0 = N, bx1 = 0, by0 = N, by1 = 0;
+            const st = [start]; seen[start] = 1;
+            while (st.length) {
+              const k = st.pop(), x = k % N, y = (k / N) | 0; area++;
+              if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y;
+              if (x <= wx0 || x >= wx1 || y <= wy0 || y >= wy1 || x <= 0 || y <= 0 || x >= N - 1 || y >= N - 1) { enclosed = false; }
+              if (area > 20000) { enclosed = false; break; }
+              for (const nk of [k - 1, k + 1, k - N, k + N]) { if (nk >= 0 && nk < N * N && !seen[nk] && !isFelt(nk)) { seen[nk] = 1; st.push(nk); } }
+            }
+            const ballArea = Math.PI * rx * ry, fill = area / Math.max(1, (bx1 - bx0 + 1) * (by1 - by0 + 1));
+            if (enclosed && area >= 10 * ballArea && fill >= 0.3) { sourceImg._racked = true; break; }
+          }
+        }
+      } catch (_) { /* a missed rack is the old behaviour, never an error */ }
+
       // cleanup: scratch data, don't leave it on marks
       for (const m of marks) { delete m._luma; delete m._sat; delete m._chroma; delete m._sd; delete m._white; delete m._eightScore; }
     }
@@ -3592,6 +3678,7 @@ async function runDetection() {
     } else {
       var _note = '';
       if (window._cueRescued)            { _note = ' \u00b7 cue auto-marked, tap to fix'; window._cueRescued = false; }
+      else if (window._cueTrimmed)       { _note = ' \u00b7 extra cue ball changed to a stripe, tap to fix'; }
       else if (window._eightHintPending) { _note = ' \u00b7 8-ball auto-marked, tap to fix'; window._eightHintPending = false; }
       else if (_groupFixed)              { _note = ' \u00b7 solid/stripe corrected, tap to fix'; }
       else if (_eightGuard)              { _note = ' \u00b7 no 8-ball set'; }
@@ -5479,6 +5566,7 @@ function _rr(ctx,x,y,w,h,r,stroke){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcT
    cluster of many balls is unmistakable, so say so plainly instead of
    crowning a nonsense "best shot" out of a rack. */
 function _looksRacked() {
+  if (sourceImg && sourceImg._racked) return true;     // seen in the picture itself
   var b = marks.filter(function(m){
     return m.type === 'obj' || m.type === 'stripe' || m.type === 'eight';
   });
@@ -7115,6 +7203,7 @@ function _rgb2hsv(r,g,b){ r/=255; g/=255; b/=255;
   return [hh, M?d/M:0, M];
 }
 function _detectTableCorners(el, natW, natH) {
+  window._tableOffFrame = false;   // set only by the off-frame check below, for this attempt
   // Core felt-finder. Works on any drawable (photo or live video frame).
   // Returns 4 corners as {fx,fy} in TL,TR,BR,BL order, or null.
   const SW = 200, SH = Math.max(60, Math.round(SW * natH / natW));
@@ -7324,6 +7413,20 @@ function _detectTableCorners(el, natW, natH) {
      it happened. */
   var vbad = _validQuad(C.map(function(c){ return [c.fx, c.fy]; }));
   if (vbad) { window._scanWhy = vbad; return null; }
+  /* MEASURED on real photos taken from a player's position: the felt ran off
+     the sides and bottom of the picture, the hull's corners landed ON the
+     frame border, and this returned the photo's own edges as the table -
+     "Table found, 6 pockets placed" - on a rectangle that was not the table.
+     Every angle was then worked out on that false shape. A felt corner on the
+     very edge of the picture means the cloth carries on past it. Two or more
+     of those and the table is not in view: say so. */
+  var onEdge = C.filter(function(c){ return c.fx <= 0.025 || c.fx >= 0.975 || c.fy <= 0.025 || c.fy >= 0.975; }).length;
+  if (onEdge >= 2) {
+    window._scanWhy = 'part of the table is outside the photo \u2014 move back so all four corners show';
+    window._tableOffFrame = true;
+    return null;
+  }
+  window._tableOffFrame = false;
   var area = Math.abs((C[1].fx-C[0].fx)*(C[3].fy-C[0].fy) - (C[3].fx-C[0].fx)*(C[1].fy-C[0].fy));
   /* Floor lowered from 0.10 after measuring real geometry. A 7ft table shot
      overhead from an 8ft ceiling fills ~59% of frame; from a player-view
@@ -7556,7 +7659,12 @@ function autoAlignTable() {
   if (!sourceImg) { setStatus('Take or upload a photo first','warn'); return; }
   try {
     const C = _detectTableCorners(sourceImg, sourceImg.width, sourceImg.height);
-    if (!C) { setStatus('Couldn\u2019t find the table \u2014 tap \ud83d\udcd0 Align Table and tap the 4 corners yourself','warn'); return; }
+    if (!C) {
+      setStatus(window._tableOffFrame
+        ? '\u26a0\ufe0f Part of the table is outside the photo, so it can\u2019t be lined up. Tap \ud83d\udd0d Suggest Best Shot and I\u2019ll ask you to tap the pocket instead \u2014 or take the photo from further back.'
+        : 'Couldn\u2019t find the table \u2014 tap \ud83d\udcd0 Align Table and tap the 4 corners yourself', 'warn');
+      return;
+    }
     var bad = _alignSanityCheck(C);
     if (bad) {
       // Don't claim a table we haven't found. Route to the one tap that works.
@@ -8595,6 +8703,13 @@ function suggestShot() {
   const body=document.getElementById('sug-body');
   const geo=document.getElementById('geo-badges');
   geo.innerHTML=''; hideSuggestion();
+  /* MEASURED: after a new photo, "Mark the Cue Ball First" appeared with the
+     previous photo's "DIFFICULTY 2/10" badge under it, and the spoken summary
+     still described the previous photo's shot - both are only replaced once a
+     full read completes, and the prompts below return before that. Clear them
+     here, so a prompt never carries an old answer. */
+  window._bestShotResult = null;
+  var _oldBadge = document.getElementById('diff-badge'); if (_oldBadge) _oldBadge.remove();
   /* The "pick a game first / mark the cue ball" prompts below write straight
      into the body, so it must start open with no stale verdict above it. */
   var _vd = document.getElementById('sug-verdict'), _mb = document.getElementById('sug-more');
@@ -8613,6 +8728,16 @@ function suggestShot() {
   if (!sourceImg) {
     titl.textContent = 'Take a Picture First';
     body.textContent = 'Start the camera or tap 📁 Upload Photo to load your table — then Suggest Best Shot can read the shot.';
+    sug.classList.add('show'); setTimeout(function(){ sug.scrollIntoView({behavior:'smooth', block:'nearest'}); }, 60); return;
+  }
+
+  /* A racked table comes first: there is no shot to read, so the cue ball
+     and the 8 do not matter yet - asking for them would be the wrong question. */
+  window._rackedNow = false;
+  if (_looksRacked()) {
+    window._rackedNow = true;
+    titl.textContent = 'Break First';
+    body.textContent = 'Those balls are still racked \u2014 a full triangle, all touching.\n\nThere is no shot to read yet: the only play is the break, and the balls block each other completely. Break them, let the table settle, then I will read it.\n\n(If they are not actually racked, tap a ball to fix its type or drag one clear and try again.)';
     sug.classList.add('show'); setTimeout(function(){ sug.scrollIntoView({behavior:'smooth', block:'nearest'}); }, 60); return;
   }
 
@@ -8635,11 +8760,6 @@ function suggestShot() {
     sug.classList.add('show'); setTimeout(function(){ sug.scrollIntoView({behavior:'smooth', block:'nearest'}); }, 60); return;
   }
 
-  if (_looksRacked()) {
-    titl.textContent = 'Break First';
-    body.textContent = 'Those balls are still racked \u2014 a full triangle, all touching.\n\nThere is no shot to read yet: the only play is the break, and the balls block each other completely. Break them, let the table settle, then I will read it.\n\n(If they are not actually racked, tap a ball to fix its type or drag one clear and try again.)';
-    sug.classList.add('show'); setTimeout(function(){ sug.scrollIntoView({behavior:'smooth', block:'nearest'}); }, 60); return;
-  }
 
   /* POCKET REALITY CHECK.
      With no aligned table AND no marked pocket, the engine used to fall back to
@@ -9103,6 +9223,9 @@ function toggleSugMore() {
   var _read = suggestShot;
   suggestShot = function () {
     var r = _read.apply(this, arguments);
+    /* A prompt instead of a read: Table Mode must not keep showing the last
+       table's shot over a table that has changed. */
+    try { if (typeof tableMode !== 'undefined' && tableMode && !window._bestShotResult) updateTableBanner(); } catch (_) {}
     try { _curlNodes(document.getElementById('suggestion')); _curlNodes(document.getElementById('tm-banner')); } catch (_) {}
     return r;
   };
@@ -11595,8 +11718,8 @@ function updateTableBanner() {
   var elL = document.getElementById('tm-conf-lbl');
   var elV = document.getElementById('tm-view');
   if (!top || !top.ball) {
-    elT.textContent = 'Looking for a shot\u2026';
-    elA.textContent = 'Keep the whole table in view.';
+    elT.textContent = window._rackedNow ? 'Break first' : 'Looking for a shot\u2026';
+    elA.textContent = window._rackedNow ? 'The balls are racked. Break, let them settle, and I\u2019ll read the table.' : 'Keep the whole table in view.';
     elC.textContent = '\u2013'; elC.style.color = '';
     if (elL) { elL.textContent = 'DIFFICULTY'; elL.style.color = ''; }
     if (elV) elV.style.display = 'none';
@@ -12864,7 +12987,8 @@ try {
   </button>
 
   <div class="hub-util">
-    <button onclick="closeHub(); setTimeout(startTour,220)">TOUR</button>
+    <!-- Every Tour button opens the welcome card first; its own button starts the tour. -->
+    <button onclick="showWelcome()">TOUR</button>
     <button onclick="closeHub(); setTimeout(toggleRules,220)">RULES</button>
     <button onclick="closeHub(); setTimeout(toggleHelp,220)">GUIDE</button>
   </div>
