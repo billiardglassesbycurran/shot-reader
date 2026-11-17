@@ -2340,7 +2340,7 @@ body.hist-mode #history-panel {
       <div class="hdr-emblem">🎱</div>
       <div style="flex:1">
         <div class="hdr-name"><span>Curran&rsquo;s Shot Reader</span></div>
-        <div class="hdr-sub">See the table. Read the shot. <span style="color:var(--gold-dim);opacity:.7">· V11.17.0859</span></div>
+        <div class="hdr-sub">See the table. Read the shot. <span style="color:var(--gold-dim);opacity:.7">· V11.17.1220</span></div>
       </div>
       <div style="flex:1 1 100%;display:flex;gap:6px;justify-content:flex-end;margin-top:7px">
         <button class="help-btn" id="hdr-tour-btn" onclick="showWelcome()" title="Welcome tour"><span style="font-size:14px">👋</span> Tour</button>
@@ -11565,6 +11565,16 @@ function tableModeUnmute() {
 /* Live camera or the big read. The read is the default the moment there is
    one; LIVE VIEW is for aiming the phone, and the choice lasts until the
    player changes it back or leaves Table Mode. */
+/* Keep the big title to two lines: shrink it a step at a time until it fits,
+   and never below the 26px the distance check demands. */
+function _tmFitTitle() {
+  var t = document.getElementById('tm-title');
+  if (!t) return;
+  t.style.fontSize = '';
+  if (!document.body.classList.contains('tm-read')) return;
+  var fs = parseFloat(getComputedStyle(t).fontSize), lh = fs * 1.02;
+  while (t.scrollHeight > lh * 2.2 && fs > 26) { fs -= 2; t.style.fontSize = fs + 'px'; lh = fs * 1.02; }
+}
 var _tmLive = false;
 function tableModeToggleView() {
   _tmLive = !_tmLive;
@@ -11596,17 +11606,19 @@ function updateTableBanner() {
 
   var names = { obj:'Solid', stripe:'Stripe', eight:'8-ball' };
   var ball  = names[top.ball.type] || 'Ball';
-  var where = top.pocket ? (getPocketType(top.pocket).label || 'pocket') : 'pocket';
-  /* "Corner" and "Side" are the words; "pocket" after them is only length,
-     and length is what forces a third line at this size. */
-  where = where.replace(/ Pocket$/, '');
+  /* Same words the voice uses, from the camera's point of view. "pocket" is
+     dropped after "side" here only to keep the big type to two lines. */
+  var where = pocketCamName(top.pocket);
+  where = where ? where.replace(/ side pocket$/, ' side') : (top.pocket ? (getPocketType(top.pocket).label || 'pocket').replace(/ Pocket$/, '') : 'pocket');
   var d     = (typeof top.difficulty === 'number') ? top.difficulty : 5;
 
   /* Name the ball the way the picture does. With more than one of a kind the
      label printed on it (S2, T1) is the only thing that says WHICH. The line
      break only shows in the big read, where the title is set pre-line. */
-  var lbl = (top.ball._lbl && top.ball._lbl.length > 1) ? (' ' + top.ball._lbl) : '';
-  elT.textContent = top.blocked ? (ball + lbl + ' \u2014\nblocked') : (ball + lbl + '\n\u2192 ' + where);
+  /* No S2 / T1 here: those labels only mean something next to the picture.
+     The pocket, named from where the phone stands, says which ball. */
+  elT.textContent = top.blocked ? (ball + ' \u2014\nblocked') : (ball + ' \u2192\n' + where);
+  _tmFitTitle();
   elA.textContent = top.blocked
     ? 'No clear path. Check the kick or combo option.'
     : (d <= 3 ? 'Good shot. Step in with confidence.'
@@ -11641,6 +11653,7 @@ function updateTableBanner() {
     elV.innerHTML = _tmLive ? '&#127919; SHOW READ' : '&#128247; LIVE VIEW';
   }
   document.body.classList.toggle('tm-read', !_tmLive);
+  _tmFitTitle();          // the class decides the size, so measure after it
 
   speakShot(buildSpokenSummary());   // silent unless chime-toggle is on
 }
@@ -11686,6 +11699,52 @@ function unlockSpeech() {
   } catch (e) {}
 }
 
+/* ── POCKETS NAMED FROM THE CAMERA'S POINT OF VIEW ──────────────────────
+   "The corner pocket" does not say which of four. The phone on its stand is
+   the one fixed point everyone at the table knows, so name the pocket from
+   there: FAR is the end of the table away from the phone, NEAR the end
+   beside it, LEFT and RIGHT as seen standing behind the phone. That is the
+   top, bottom, left and right of the photo - the rear camera is not mirrored.
+   Aligned table: the six real pockets are placed by the geometry, so rank
+   them in the photo (the two corners highest in the picture are the far
+   ones, and so on) rather than trusting a raw screen position, which a
+   tilted or angled view distorts. Unaligned: fall back to where the pocket
+   sits in the photo. Returns e.g. 'far left corner', 'near side pocket',
+   'left side pocket', or '' if there is nothing to go on. */
+function pocketCamName(pk) {
+  if (!pk) return '';
+  try {
+    if (typeof cbReady === 'function' && cbReady()) {
+      var c = geoP(pk), all = cbPockets(), near = null, nd = Infinity;
+      all.forEach(function (k) { var d = Math.hypot(k.fx - c.fx, k.fy - c.fy); if (d < nd) { nd = d; near = k; } });
+      if (near && nd < 0.12) {
+        var onPhoto = function (k) { return canonToRaw(k) || { fx: .5, fy: .5 }; };
+        if (near.corner) {
+          var cs = all.filter(function (k) { return k.corner; })
+                      .map(function (k) { return { k: k, p: onPhoto(k) }; })
+                      .sort(function (a, b) { return a.p.fy - b.p.fy; });
+          var farPair = [cs[0], cs[1]], i = farPair.indexOf(farPair.filter(function (x) { return x.k === near; })[0]);
+          var pair = (i !== -1) ? farPair : [cs[2], cs[3]];
+          var me = pair.filter(function (x) { return x.k === near; })[0], other = pair[0] === me ? pair[1] : pair[0];
+          return (i !== -1 ? 'far ' : 'near ') + (me.p.fx <= other.p.fx ? 'left' : 'right') + ' corner';
+        }
+        var ss = all.filter(function (k) { return !k.corner; }).map(function (k) { return { k: k, p: onPhoto(k) }; });
+        var me2 = ss.filter(function (x) { return x.k === near; })[0], o2 = ss[0] === me2 ? ss[1] : ss[0];
+        /* Side pockets one above the other in the picture are far and near;
+           side by side, the long rails run away from the camera, so they are
+           the left and right side pockets. */
+        return (Math.abs(me2.p.fy - o2.p.fy) >= Math.abs(me2.p.fx - o2.p.fx))
+          ? (me2.p.fy < o2.p.fy ? 'far' : 'near') + ' side pocket'
+          : (me2.p.fx < o2.p.fx ? 'left' : 'right') + ' side pocket';
+      }
+    }
+    var t = getPocketType(pk), x = pk.fx, y = pk.fy;
+    if (t.corner) return (y < .5 ? 'far ' : 'near ') + (x < .5 ? 'left' : 'right') + ' corner';
+    if (/Side/.test(t.label)) return (x < .25 || x > .75) ? (x < .5 ? 'left' : 'right') + ' side pocket' : (y < .5 ? 'far' : 'near') + ' side pocket';
+  } catch (_) {}
+  return '';
+}
+
 /* Short spoken line from the crowned shot. Deliberately plainer than the
    on-screen advice - heard once, at a table, with no chance to re-read. */
 function buildSpokenSummary() {
@@ -11697,13 +11756,17 @@ function buildSpokenSummary() {
     var names = { obj:'solid', stripe:'stripe', eight:'eight ball' };
     var ball = names[top.ball.type] || 'ball';
     if (top.blocked) return 'The ' + ball + ' is blocked. Check the kick or combo option.';
-    var where = top.pocket ? String(getPocketType(top.pocket).label || 'pocket').toLowerCase() : 'pocket';
+    var where = pocketCamName(top.pocket)
+             || (top.pocket ? String(getPocketType(top.pocket).label || 'pocket').toLowerCase() : 'pocket');
     var d = (typeof top.difficulty === 'number') ? top.difficulty : 5;
     var how = d <= 3 ? 'This one is easy.'
             : d <= 5 ? 'Moderate shot.'
             : d <= 8 ? 'Tough shot.'
                      : 'Very low percentage. A safety may be smarter.';
-    return 'Take the ' + ball + ' to the ' + where + '. ' + how;
+    /* The pocket does the identifying: only one ball of that kind is usually
+       lined up for the far left corner, so the player can find it without
+       looking at the screen - which is the point of hearing it. */
+    return capitalize(ball) + ' into the ' + where + '. ' + how;
   } catch (e) { return ''; }
 }
 
@@ -12270,10 +12333,10 @@ try {
 
         <div class="help-item">
           <div class="help-icon">&#128266;</div>
-          <div><div class="help-item-title">Hearing the shot called out</div><div class="help-item-desc">In Table Mode the app can <strong>say the shot out loud</strong> &mdash; &ldquo;Take the solid to the corner pocket. This one is easy.&rdquo; &mdash; so you don&rsquo;t have to look at the screen at all. It&rsquo;s tied to the <strong>&#128276; Sound &amp; spoken shot calls</strong> switch in Advanced Tuning: chimes on means it speaks, chimes off means it stays quiet. It only speaks when the call actually changes, so it won&rsquo;t repeat itself at you.</div>
+          <div><div class="help-item-title">Hearing the shot called out</div><div class="help-item-desc">In Table Mode the app can <strong>say the shot out loud</strong> &mdash; &ldquo;Solid into the far left corner. This one is easy.&rdquo; &mdash; so you don&rsquo;t have to look at the screen at all. It&rsquo;s tied to the <strong>&#128276; Sound &amp; spoken shot calls</strong> switch in Advanced Tuning: chimes on means it speaks, chimes off means it stays quiet. It only speaks when the call actually changes, so it won&rsquo;t repeat itself at you.</div>
           <div class="help-item-desc" style="margin-top:8px"><strong>What it actually says.</strong> Three parts, every time &mdash; which ball, which pocket, and how hard it reckons the shot is:<br>
-          &ldquo;<em>Take the <strong>solid</strong> to the <strong>corner pocket</strong>. <strong>This one is easy.</strong></em>&rdquo;<br>
-          The ball is <em>solid</em>, <em>stripe</em> or <em>eight ball</em>. The pocket is <em>corner pocket</em> or <em>side pocket</em>. The last part is one of four, depending on the difficulty score: <em>This one is easy</em> (1&ndash;3), <em>Moderate shot</em> (4&ndash;5), <em>Tough shot</em> (6&ndash;8), or <em>Very low percentage. A safety may be smarter</em> (9&ndash;10). If the path is blocked it says so instead: &ldquo;<em>The stripe is blocked. Check the kick or combo option.</em>&rdquo;<br>
+          &ldquo;<em><strong>Solid</strong> into the <strong>far left corner</strong>. <strong>This one is easy.</strong></em>&rdquo;<br>
+          The ball is <em>solid</em>, <em>stripe</em> or <em>eight ball</em>. The pocket is named <strong>from where the phone stands</strong>: <em>far</em> is the end of the table away from the phone, <em>near</em> the end beside it, and <em>left</em> and <em>right</em> are as you see them standing behind the phone &mdash; so <em>far left corner</em>, <em>near right corner</em>, <em>far side pocket</em>, or <em>left side pocket</em> when the long rails run away from you. Naming the pocket is what tells you which ball: usually only one of that kind is lined up for it. The big read on screen uses the same words. The last part is one of four, depending on the difficulty score: <em>This one is easy</em> (1&ndash;3), <em>Moderate shot</em> (4&ndash;5), <em>Tough shot</em> (6&ndash;8), or <em>Very low percentage. A safety may be smarter</em> (9&ndash;10). If the path is blocked it says so instead: &ldquo;<em>The stripe is blocked. Check the kick or combo option.</em>&rdquo;<br>
           <strong>It only talks &mdash; it doesn&rsquo;t listen.</strong> There are no voice commands and the microphone is never used. On an older iPhone, or an Android without Google Text-to-Speech installed, there may be no voice available &mdash; everything else still works.</div></div>
         </div>
 
