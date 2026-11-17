@@ -467,6 +467,19 @@ input[type=range]::-moz-range-thumb {
   color:var(--green-soft); margin-bottom:8px; display:flex; align-items:center; gap:7px;
 }
 .sug-body { font-size:14.5px; color:var(--cream); line-height:1.7; white-space:pre-wrap; }
+/* VERDICT + DISCLOSURE. The panel was one block of 130-150 words in BOTH
+   modes, nearly a full phone screen, so the answer to "which ball, which
+   pocket, is it on?" had to be dug out of a paragraph. Those three things now
+   stand on their own at a size meant to be read with a cue in the other hand;
+   everything else is one tap away and nothing was removed. */
+.sug-verdict { font-size:16px; line-height:1.5; color:var(--cream); font-weight:600; white-space:pre-line; margin-bottom:10px; }
+.sug-more {
+  display:inline-flex; align-items:center; justify-content:center; min-height:44px;
+  background:rgba(0,0,0,.25); border:1px solid var(--gold-dim); border-radius:10px;
+  color:var(--gold); padding:6px 14px; margin:0 0 10px; cursor:pointer;
+  font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:14px; letter-spacing:.5px;
+}
+.sug-body.collapsed { display:none; }
 
 /* GEO BADGES */
 .geo-badges { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
@@ -1247,6 +1260,12 @@ input[type=range]::-moz-range-thumb {
   background:#0d2430; color:#9fe4ff; border:1px solid #2c4a63;
 }
 #step2-anchor .sub{ opacity:.6; font-weight:400; }
+#swap-rails-btn{
+  width:100%; min-height:44px; font-size:13px; font-weight:600;
+  align-items:center; justify-content:center; gap:7px; flex-wrap:wrap;
+  background:#1f1a0b; color:var(--gold-lt); border:1px solid var(--gold-dim);
+}
+#swap-rails-btn .sub{ opacity:.65; font-weight:400; }
 
 /* Step markers: brass discs, so the numbered flow reads as a guided path */
 .step-dot{
@@ -1574,6 +1593,22 @@ body.table-mode #english-panel {
   display: none !important;
 }
 
+/* The brand block is 313px of a portrait phone before any table appears -
+   over a third of the screen. Landscape already hides it; portrait now does
+   the same. MENU, the title, the Simple/Adv switch and Rules all stay. */
+body.table-mode #hdr-logo,
+body.table-mode .hdr-emblem,
+body.table-mode .hdr-name,
+body.table-mode .hdr-sub,
+body.table-mode #model-banner { display: none !important; }
+body.table-mode .hdr-inner { border-top: none !important; padding-top: 0 !important; margin-top: 0 !important; }
+
+/* The split / swap buttons arrange the Scan page's side-by-side landscape
+   layout. Table Mode hides that layout, so here they did nothing except float
+   over the middle of the camera view. */
+body.table-mode #ls-swap-btn,
+body.table-mode #ls-split-btn { display: none !important; }
+
 /* ITEM 6: Tour and Guide describe the setup flow, which Table Mode hides.
    Rules stays - official game rules are useful mid-game on any screen. */
 /* Shown only in Table Mode, only in portrait. It lives INSIDE the banner, so
@@ -1616,7 +1651,11 @@ body.table-mode #english-panel {
   body.table-mode .hdr-name,
   body.table-mode .hdr-sub,
   body.table-mode #model-banner { display: none !important; }
-  body.table-mode .hdr-inner > div:last-child { margin-top: 0 !important; }
+  /* MEASURED: this wrapper sat at 16-60px inside a 52px header that clips its
+     overflow - so the Rules pill lost its bottom 8px, and the motion bar,
+     pinned at 52px, was painted over that strip. Centre it in the row. */
+  body.table-mode .hdr-inner > div:last-child { margin-top: 0 !important; align-self: center; }
+  body.table-mode .hdr-inner { flex-wrap: nowrap; align-content: center; }
 
   /* Rules has to share the destination bar's row, not sit on a second one.
      Everything below is positioned on the assumption that Table Mode chrome is
@@ -1746,6 +1785,90 @@ body.table-mode #tm-banner {
 }
 body.table-mode #tm-banner.recover { border-top-color: #ff9d7a; }
 
+/* ══ TABLE MODE — THE BIG READ ═════════════════════════════════════════
+   Table Mode is used from a stand, with the player standing at the table.
+   MEASURED: the read used to top out at 19px, about 2mm tall on a phone.
+   20/20 vision needs roughly 2.7mm letters just to resolve them at six feet,
+   so the one screen built for distance could only be read at arm's length.
+
+   Once there is a read the banner takes the whole screen: the captured frame
+   with the shot drawn on it (so "which solid?" is answered by the picture),
+   the ball and pocket in type sized off the viewport, the contact-point ball,
+   and the difficulty. LIVE VIEW goes back to the camera for setting up.
+   Sizes use vh in landscape because height is what a sideways phone is short
+   of; no transforms, so type stays on whole pixels. */
+#tm-glance, #tm-key, #tm-view { display: none; }
+#tm-rate { text-align: right; }
+#tm-view {
+  margin-top: 6px; background: #10261a; color: #bfe9cf; border: 1px solid #2f6b47;
+  border-radius: 8px; padding: 5px 10px; min-height: 44px; cursor: pointer;
+  font-family: 'Barlow Condensed', sans-serif; font-weight: 700; letter-spacing: .4px;
+  font-size: clamp(11px, 3vw, 13px); align-items: center; justify-content: center;
+  white-space: nowrap;
+}
+body.table-mode.tm-read #tm-banner {
+  top: 0; z-index: 95;
+  display: flex; flex-direction: column; gap: 10px;
+  padding-top: calc(10px + env(safe-area-inset-top, 0px));
+  background: #06120b; border-top: none; overflow: hidden;
+}
+body.table-mode.tm-read #tm-rotate { margin: 0; flex: 0 0 auto; }
+body.table-mode.tm-read #tm-glance {
+  display: block; flex: 1 1 0; min-height: 0; min-width: 0;
+  border-radius: 12px; overflow: hidden; background: #020805;
+  border: 1px solid var(--border);
+}
+body.table-mode.tm-read #tm-shot { display: block; width: 100%; height: 100%; object-fit: contain; cursor: pointer; }
+@media (orientation: portrait) {
+  /* A sideways table in an upright phone leaves black bars above and below
+     it. Let the picture take only the height it needs. */
+  body.table-mode.tm-read #tm-glance { flex: 0 1 auto; }
+  body.table-mode.tm-read #tm-shot { height: auto; max-height: 100%; }
+}
+body.table-mode.tm-read #tm-row { flex: 0 0 auto; flex-direction: column; align-items: stretch; gap: 8px; }
+body.table-mode.tm-read #tm-title {
+  white-space: pre-line; line-height: 1.02; letter-spacing: .5px; text-transform: uppercase;
+  font-size: clamp(30px, 10.5vw, 54px);
+}
+body.table-mode.tm-read #tm-advice { font-size: clamp(15px, 4.6vw, 22px); line-height: 1.25; margin-top: 6px; }
+/* Contact ball and difficulty on one line, the two buttons on the next -
+   as a grid so the buttons can never wrap off the bottom of a short phone. */
+body.table-mode.tm-read #tm-side { display: grid; grid-template-columns: auto 1fr; align-items: center;
+  column-gap: 14px; row-gap: 10px; text-align: left; }
+body.table-mode.tm-read #tm-view { grid-column: 1; justify-self: start; }
+body.table-mode.tm-read #tm-exit { grid-column: 2; justify-self: start; }
+body.table-mode.tm-read #tm-mute { grid-column: 1 / -1; }
+body.table-mode.tm-read #tm-key:empty + #tm-rate { grid-column: 1 / -1; }
+body.table-mode.tm-read #tm-key { display: block; flex: 0 0 auto; text-align: center; line-height: 0; }
+body.table-mode.tm-read #tm-key:empty { display: none; }
+body.table-mode.tm-read #tm-key svg { display: block; width: auto; height: clamp(84px, 24vw, 132px); }
+/* The contact ball's two caption lines are sized for the Scan page; here the
+   number is the message, so it is restyled rather than repeated. */
+body.table-mode.tm-read #tm-key div { display: none; }
+body.table-mode.tm-read #tm-rate { text-align: left; flex: 1 1 auto; min-width: 0; }
+body.table-mode.tm-read #tm-conf { font-size: clamp(34px, 11vw, 60px); line-height: .95; }
+body.table-mode.tm-read #tm-conf-lbl { font-size: clamp(13px, 3.8vw, 19px); letter-spacing: 1px; font-weight: 700;
+  font-family: 'Barlow Condensed', sans-serif; margin-top: 3px; }
+body.table-mode.tm-read #tm-view,
+body.table-mode.tm-read #tm-exit {
+  display: inline-flex !important; margin-top: 0; min-height: 48px; padding: 6px 14px;
+  font-size: clamp(13px, 3.6vw, 16px); font-weight: 700;
+}
+body.table-mode.tm-read #tm-mute { margin-top: 0; }
+@media (orientation: landscape) {
+  body.table-mode.tm-read #tm-banner { flex-direction: row; gap: 14px; padding-top: calc(8px + env(safe-area-inset-top, 0px)); }
+  body.table-mode.tm-read #tm-glance { flex: 1.25 1 0; }
+  body.table-mode.tm-read #tm-row { flex: 1 1 0; min-width: 0; justify-content: space-between; }
+  /* min() of height and width: a short, narrow phone (iPhone SE sideways,
+     667x375) is limited by BOTH, and sizing off height alone pushed the
+     buttons 27px off the bottom of that screen. */
+  body.table-mode.tm-read #tm-title { font-size: clamp(26px, min(13.5vh, 6.2vw), 66px); }
+  body.table-mode.tm-read #tm-advice { font-size: clamp(14px, min(5.4vh, 2.6vw), 26px); }
+  body.table-mode.tm-read #tm-key svg { height: clamp(70px, 25vh, 140px); }
+  body.table-mode.tm-read #tm-conf { font-size: clamp(30px, 13vh, 62px); }
+  body.table-mode.tm-read #tm-conf-lbl { font-size: clamp(12px, 4.6vh, 20px); }
+}
+
 /* ═══ SCOREBOARD MODE ════════════════════════════════════════════════
    Its own full-screen mode, entered and left the same way Table Mode is.
    Built as a fixed overlay rather than by hiding the page element-by-element:
@@ -1801,8 +1924,10 @@ body.score-mode #scoreboard {
            font-size: clamp(16px,4.8vw,21px); cursor:pointer; }
 /* Tap strip sits BELOW pass turn on purpose: everything above it is meant to be
    read from across a table, so no controls are allowed to crowd it. */
-#sb-taps { display:flex; gap:6px; margin-top:8px; flex-shrink:0; }
-#sb-taps button { flex:1; min-height:48px; border-radius:10px; cursor:pointer;
+#sb-taps { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; flex-shrink:0; }
+/* 40% basis: two buttons share a row, four make two rows of two. */
+#sb-taps button { flex:1 1 40%; min-width:0; min-height:48px; border-radius:10px; cursor:pointer;
+                  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 6px;
                   font-family:'Barlow Condensed',sans-serif; font-weight:700;
                   font-size: clamp(13px,4vw,16px); letter-spacing:.4px; }
 #sb-controls { display:flex; flex-direction:column; flex-shrink:0; }
@@ -1839,8 +1964,8 @@ body.score-mode #scoreboard {
   #sb-controls { flex-direction: row; align-items: stretch; gap: 8px; margin-top: 8px; }
   #sb-controls > div:first-child { margin-top: 0 !important; flex: 0 0 34%; }
   #sb-pass { min-height: 48px; font-size: clamp(14px, 2.4vw, 17px); }
-  #sb-taps { margin-top: 0; flex: 1 1 auto; }
-  #sb-taps button { min-height: 48px; }
+  #sb-taps { margin-top: 0; flex: 1 1 auto; flex-wrap: nowrap; }
+  #sb-taps button { min-height: 48px; flex: 1 1 0; font-size: clamp(11px, 1.8vw, 15px); }
   #sb-warn { margin-top: 6px; padding: 6px 8px; }
   #sb-exit { margin-top: 0; min-height: 48px; padding: 0 14px; flex: 0 0 auto; align-self: stretch; }
 }
@@ -2132,7 +2257,7 @@ body.hist-mode #history-panel {
       <div class="hdr-emblem">🎱</div>
       <div style="flex:1">
         <div class="hdr-name"><span>Curran&rsquo;s Shot Reader</span></div>
-        <div class="hdr-sub">See the table. Read the shot. <span style="color:var(--gold-dim);opacity:.7">· V11.16.0855</span></div>
+        <div class="hdr-sub">See the table. Read the shot. <span style="color:var(--gold-dim);opacity:.7">· V11.17.0148</span></div>
       </div>
       <div style="flex:1 1 100%;display:flex;gap:6px;justify-content:flex-end;margin-top:7px">
         <button class="help-btn" id="hdr-tour-btn" onclick="showWelcome()" title="Welcome tour"><span style="font-size:14px">👋</span> Tour</button>
@@ -2454,14 +2579,23 @@ body.hist-mode #history-panel {
       <span class="tm-rot-ico">&#8635;</span>
       <span><b>Turn your phone sideways.</b> Table Mode is built for landscape &mdash; the whole table fits, nothing to scroll.</span>
     </div>
+    <!-- BIG READ: the captured frame with the shot drawn on it. Shown only once
+         there is a read, and only until the player asks for the live view. -->
+    <div id="tm-glance">
+      <img id="tm-shot" alt="Your table with the suggested shot drawn on it" onclick="tableModeTapScan()">
+    </div>
     <div id="tm-row">
       <div id="tm-text">
         <div id="tm-title">Getting ready…</div>
         <div id="tm-advice">Point the camera at the table.</div>
       </div>
       <div id="tm-side">
-        <div id="tm-conf">–</div>
-        <div id="tm-conf-lbl">SURE</div>
+        <div id="tm-key"></div>
+        <div id="tm-rate">
+          <div id="tm-conf">–</div>
+          <div id="tm-conf-lbl">DIFFICULTY</div>
+        </div>
+        <button id="tm-view" onclick="tableModeToggleView()" style="display:none">&#128247; LIVE VIEW</button>
         <button id="tm-exit" onclick="exitTableMode()">✕ EXIT</button>
         <div id="tm-mute" onclick="tableModeUnmute()" role="button" tabindex="0" style="display:none">🔇 MUTED — TAP</div>
       </div>
@@ -2600,6 +2734,9 @@ body.hist-mode #history-panel {
         <div class="sug-title"  id="sug-title"></div>
         <div class="contact-key" id="contact-key" style="display:none;float:right;margin:0 0 8px 12px;text-align:center"></div>
         <div id="contact-key-note" style="display:none;font-size:11.5px;color:var(--text-muted);font-style:italic;margin:0 0 8px;line-height:1.45"></div>
+        <!-- The verdict is always on screen; the full read sits behind one tap. -->
+        <div class="sug-verdict" id="sug-verdict" style="display:none"></div>
+        <button class="sug-more" id="sug-more" onclick="toggleSugMore()" aria-expanded="false" aria-controls="sug-body" style="display:none">Show the full read &#9662;</button>
         <div class="sug-body"   id="sug-body"></div>
         <div class="coaching-box" id="coaching-box"></div>
       </div>
@@ -2614,6 +2751,9 @@ body.hist-mode #history-panel {
     <div id="align-explain">✨ <strong>Auto finds the table for you.</strong> Use it first — only use <strong>📐 Align Table by hand</strong> if Auto can&rsquo;t see the corners.</div>
     <button class="btn" id="auto-align-btn" onclick="autoAlignTable()" title="Let the app find the table"><span style="font-size:19px">✨</span> AUTO&nbsp;—&nbsp;FIND MY TABLE</button>
     <button class="btn" id="step2-anchor" onclick="startAlign()"><span style="font-size:15px">📐</span> Align Table by hand <span class="sub">— tap the 4 corners</span></button>
+    <!-- Shown only while a table is aligned. The side pockets are the tell:
+         if they sit on the SHORT rails, the long rail was picked wrong. -->
+    <button class="btn" id="swap-rails-btn" onclick="swapTableRails()" style="display:none"><span style="font-size:15px">⇄</span> Side pockets on the short rails? <span class="sub">— tap to fix</span></button>
   </div>
   <div class="adv-only" style="font-size:11.5px;color:var(--text-muted);margin:3px 2px 0;line-height:1.4">Drag corners to fine-tune · add single pockets with <strong style="color:#9fe4ff">＋ Pocket</strong> · tap a pocket twice to remove it.</div>
 
@@ -2758,17 +2898,25 @@ body.hist-mode #history-panel {
 
     <!-- STICKY ACTION BAR -->
     <div class="sticky-action-bar" id="sticky-action-bar" style="flex-direction:column;gap:6px">
-      <div id="conf-row" style="display:flex;align-items:center;gap:8px;width:100%;background:rgba(14,30,21,.92);border:1px solid var(--border);border-radius:10px;padding:6px 11px">
-        <span style="font-size:11.5px;color:var(--cream);font-weight:600;white-space:nowrap;letter-spacing:.3px">🎚️ AI Confidence</span>
-        <input type="range" id="conf-slider-sticky" min="10" max="80" value="35" style="flex:1;accent-color:var(--gold)"
-          oninput="syncConf(this.value)">
-        <span style="font-size:11px;color:var(--gold);font-weight:700;min-width:34px;text-align:right" id="conf-val-sticky">35%</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;width:100%;padding:0 5px;margin-top:-2px;font-size:10px;color:var(--muted);white-space:nowrap">
-        <span>Missed some balls? Slide left</span>
-        <span>Marked things that aren&rsquo;t balls? Slide right</span>
+      <!-- The slider is a tuning control: needed when detection is off, in the
+           way the rest of the time. It lives in a drawer the chip opens, and
+           opens itself when detection finds nothing. -->
+      <div id="conf-drawer" style="display:none;flex-direction:column;gap:6px;width:100%">
+        <div id="conf-row" style="display:flex;align-items:center;gap:8px;width:100%;background:rgba(14,30,21,.92);border:1px solid var(--border);border-radius:10px;padding:6px 11px">
+          <span style="font-size:11.5px;color:var(--cream);font-weight:600;white-space:nowrap;letter-spacing:.3px">🎚️ AI Confidence</span>
+          <input type="range" id="conf-slider-sticky" min="10" max="80" value="35" style="flex:1;min-width:0;accent-color:var(--gold)"
+            oninput="syncConf(this.value)">
+          <span style="font-size:11px;color:var(--gold);font-weight:700;min-width:34px;text-align:right" id="conf-val-sticky">35%</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;width:100%;padding:0 5px;margin-top:-2px;font-size:10px;color:var(--muted);white-space:nowrap">
+          <span>Missed some balls? Slide left</span>
+          <span>Marked things that aren&rsquo;t balls? Slide right</span>
+        </div>
       </div>
       <div style="display:flex;gap:8px;width:100%">
+        <button class="btn" id="conf-chip" onclick="toggleConfDrawer()" aria-expanded="false" aria-controls="conf-drawer"
+          aria-label="AI Confidence, tap to adjust" title="AI Confidence"
+          style="flex:0 0 auto;min-width:62px;padding-left:8px;padding-right:8px;background:rgba(14,30,21,.92);border:1px solid var(--gold-dim);color:var(--gold)">🎚️&nbsp;<span id="conf-chip-val">35%</span></button>
         <button class="btn btn-ai" id="ai-btn" onclick="runDetection()" disabled style="flex:1">🤖 AI Detect</button>
         <button class="btn btn-gold" onclick="suggestShot()" style="flex:1.4">🔍 Suggest Best Shot</button>
       </div>
@@ -3038,7 +3186,10 @@ async function runDetection() {
       if (brightness < 40) reason = 'Image too dark — try better lighting';
       else if (brightness > 215) reason = 'Image too bright — reduce exposure';
       else if (canvas.width < 300) reason = 'Image too small — move camera closer';
-      else reason = 'No balls detected — try lowering AI Confidence or mark balls manually';
+      else {
+        reason = 'No balls detected — slide AI Confidence left (it has opened below) or mark balls manually';
+        try { toggleConfDrawer(true); } catch (_) {}     // the fix, put in the player's hand
+      }
       setStatus('⚠️ ' + reason, 'warn');
       aiBtn.disabled = false;
       aiBtn.textContent = '🤖 AI Detect';
@@ -4396,7 +4547,7 @@ async function captureFrame(mode) {
   tmp.getContext('2d').drawImage(video, 0, 0, vw, vh);
   const img = new Image();
   img.onload = () => {
-    sourceImg = img; marks = []; aligning = false; window._tableH = null; window._tHf = null; window._tHinv = null; window._tCanonLong = null; _pickingLowest = false; window._pendingPocketRemove = null; _sampleMode = false;
+    sourceImg = img; marks = []; aligning = false; window._tableH = null; window._tHf = null; window._tHinv = null; window._tCanonLong = null; window._tLongFlip = false; _pickingLowest = false; window._pendingPocketRemove = null; _sampleMode = false;
     renderCanvas();
     updateQuickModeRow();
     // Camera capture: auto-align immediately (fail-open — worst case is the
@@ -4448,7 +4599,7 @@ function loadImageFile(file) {
        leave it first - its CSS hides #table-stage, so the picture would load
        into a canvas nobody can see. */
     if (typeof tableMode !== 'undefined' && tableMode) { try { leaveTableMode(); } catch (_) {} }
-    stopCamera(); sourceImg = img; marks = []; aligning = false; window._tableH = null; window._tHf = null; window._tHinv = null; window._tCanonLong = null; _pickingLowest = false; window._pendingPocketRemove = null; _sampleMode = false;
+    stopCamera(); sourceImg = img; marks = []; aligning = false; window._tableH = null; window._tHf = null; window._tHinv = null; window._tCanonLong = null; window._tLongFlip = false; _pickingLowest = false; window._pendingPocketRemove = null; _sampleMode = false;
     renderCanvas();
     updateQuickModeRow();
     placeholder.style.display = 'none'; canvas.style.display = 'block';
@@ -4472,6 +4623,7 @@ function renderCanvas() {
   try { assignBallLabels(); } catch (_) {}
   if (typeof updateScanSteps === 'function') updateScanSteps();
   if (typeof updateRePocketBtn === 'function') updateRePocketBtn();
+  if (typeof updateSwapRailsBtn === 'function') updateSwapRailsBtn();
   if (!sourceImg) return;
   const card = document.getElementById('canvas-card');
   const maxW = card.clientWidth || 560;
@@ -6820,7 +6972,9 @@ function rebuildFromCorners() {
        in PIXEL space there; a photo is not square, so the two could disagree -
        side pockets drawn on one pair of rails while every angle was computed
        on a table squashed the other way. */
-    const tl = _tableLongIsTop(dst, W, H) ? 1 : 0;
+    /* _tLongFlip is the player overruling the guess with the swap button. It
+       is cleared whenever the alignment itself is thrown away. */
+    const tl = (_tableLongIsTop(dst, W, H) !== !!window._tLongFlip) ? 1 : 0;
     const ll = 1 - tl;
     const canonF = (tl >= ll)
       ? [{x:0,y:0},{x:1,y:0},{x:1,y:0.5},{x:0,y:0.5}]
@@ -7317,6 +7471,7 @@ function autoAlignTable() {
     marks = marks.filter(m => m.type !== 'corner' && m.type !== 'pocket');
     aligning = false; updateAlignChrome();
     C.forEach((c, idx) => marks.push({ type:'corner', idx, fx:c.fx, fy:c.fy }));
+    window._tLongFlip = false;          // a fresh alignment starts from the app's own guess
     rebuildFromCorners();
     renderCanvas(); hideSuggestion();
     var _pc = window._alignPlaced ? window._alignPlaced() : 6;
@@ -7329,7 +7484,7 @@ function startAlign() {
   if (!sourceImg) { setStatus('Load or capture a photo first','warn'); return; }
   // Option A: aligning starts a clean slate — old pockets and any old box go.
   marks = marks.filter(m => m.type !== 'corner' && m.type !== 'pocket');
-  window._tableH = null; window._tHf = null; window._tHinv = null; window._tCanonLong = null;
+  window._tableH = null; window._tHf = null; window._tHinv = null; window._tCanonLong = null; window._tLongFlip = false;
   aligning = true;
   updateAlignChrome();
   renderCanvas(); hideSuggestion();
@@ -7400,6 +7555,22 @@ function rePickPocket() {
   renderCanvas();
   setStatus('\ud83c\udfaf Tap the pocket you want to aim at', 'gold');
   updateRePocketBtn();
+}
+/* Which pair of rails is long is worked out from the picture, and from the
+   short end of the table at a low camera angle that guess is wrong about one
+   time in forty. When it is, every angle on that photo is wrong and nothing
+   says so - except that the side pockets land on the short rails, which a
+   player can see at a glance. One tap turns the table round. */
+function swapTableRails() {
+  if (!window._tHf) return;
+  window._tLongFlip = !window._tLongFlip;
+  rebuildFromCorners();
+  hideSuggestion();
+  setStatus('Table turned round \u2014 side pockets are now on the other pair of rails. Tap again to undo.', 'gold');
+}
+function updateSwapRailsBtn() {
+  var b = document.getElementById('swap-rails-btn');
+  if (b) b.style.display = (sourceImg && window._tHf && !aligning) ? 'flex' : 'none';
 }
 function updateRePocketBtn() {
   var b = document.getElementById('repocket-btn');
@@ -8325,6 +8496,12 @@ function suggestShot() {
   const body=document.getElementById('sug-body');
   const geo=document.getElementById('geo-badges');
   geo.innerHTML=''; hideSuggestion();
+  /* The "pick a game first / mark the cue ball" prompts below write straight
+     into the body, so it must start open with no stale verdict above it. */
+  var _vd = document.getElementById('sug-verdict'), _mb = document.getElementById('sug-more');
+  if (_vd) { _vd.textContent = ''; _vd.style.display = 'none'; }
+  if (_mb) _mb.style.display = 'none';
+  body.classList.remove('collapsed');
   var _ck = document.getElementById('contact-key'); if (_ck) _ck.style.display='none';
   var _ckn0 = document.getElementById('contact-key-note'); if (_ckn0) _ckn0.style.display='none';
 
@@ -8531,9 +8708,13 @@ function suggestShot() {
          stops being read at all. A scratch is different: it loses you the
          table, so it is allowed to interrupt. */
       if (cr.scratch) {
-        cueNote = '\n\n⚠️ SCRATCH: on a stun the cue ball runs straight into the '
-          + (cr.scratch.corner ? 'corner' : 'side') + ' \u2014 at any speed. Draw or follow off the '
-          + 'tangent, or take a different pocket.';
+        cueNote = simpleMode
+          ? '\n\n⚠️ SCRATCH: hit dead centre, the cue ball runs straight into the '
+            + (cr.scratch.corner ? 'corner' : 'side') + ' pocket \u2014 at any speed. Hit it higher or lower '
+            + 'to steer it away, or take a different pocket.'
+          : '\n\n⚠️ SCRATCH: on a stun the cue ball runs straight into the '
+            + (cr.scratch.corner ? 'corner' : 'side') + ' \u2014 at any speed. Draw or follow off the '
+            + 'tangent, or take a different pocket.';
       }
 
       /* ── PATTERN: what this shot leaves you on ──────────────────────
@@ -8759,7 +8940,23 @@ function suggestShot() {
   else if (difficulty <= 5) plainHeadline = '⚖️ This is a moderate shot — focus and commit.\n\n';
   else if (difficulty <= 8) plainHeadline = '⚠️ This is a tough shot — low percentage, weigh your options.\n\n';
   else                      plainHeadline = '🛑 This is a very low-percentage shot — a safety may be smarter.\n\n';
-  body.textContent = plainHeadline + advice + englishAdvice + safetyNote + cueNote + kickNote + comboNote + nineNote + eightNote + sampleNote;
+  /* VERDICT: is it on, which ball, which pocket - and any warning that must
+     not sit behind a tap. Built only from values already decided above. */
+  var verdict = plainHeadline.trim();
+  if (targetBall && !_blockedNow) {
+    verdict += '\n\ud83c\udfaf ' + capitalize(patternBallWord(targetBall))
+            + (pocketInfo ? ' \u2192 ' + pocketInfo.label.toLowerCase() : '') + '.';
+  }
+  if (cueNote.indexOf('SCRATCH') !== -1) verdict += '\n\u26a0\ufe0f Scratch risk on a ' + (simpleMode ? 'centre-ball hit' : 'stun shot') + ' \u2014 see the full read.';
+  if (kickNote)  verdict += '\n\ud83c\udfb1 A kick is drawn in gold on the table.';
+  if (comboNote) verdict += '\n\ud83c\udfaf There is a combo option in the full read.';
+  if (gameMode === '9ball' && nineNote.indexOf('MAKEABLE') !== -1)
+    verdict += '\n\u26a0\ufe0f Set your lowest ball so this is a legal shot.';
+  if (_vd) { _vd.textContent = verdict; _vd.style.display = 'block'; }
+  body.textContent = (advice + englishAdvice + safetyNote + cueNote + kickNote + comboNote + nineNote + eightNote + sampleNote).replace(/^\s+/, '');
+  /* Simple opens closed, Advanced opens open; once the player taps the
+     button their choice holds for the rest of the session. */
+  _sugApply((_sugOpen === null) ? !simpleMode : _sugOpen);
   if (!_keepFocus) _focusRank = 0;
   updateShotSelector();
   window._shotRead = true;          // presentation flag for the progress ribbon only
@@ -8784,6 +8981,21 @@ function suggestShot() {
 
   updateTableBanner();          // Stage 4: no-op unless Table Mode is on
   saveSettings();
+}
+
+var _sugOpen = null;          // null = follow the mode's default
+function _sugApply(open) {
+  var b = document.getElementById('sug-body'), m = document.getElementById('sug-more');
+  if (!b || !m) return;
+  b.classList.toggle('collapsed', !open);
+  m.style.display = 'inline-flex';
+  m.setAttribute('aria-expanded', open ? 'true' : 'false');
+  m.innerHTML = open ? 'Hide the full read &#9652;' : 'Show the full read &#9662;';
+}
+function toggleSugMore() {
+  var b = document.getElementById('sug-body');
+  _sugOpen = !!(b && b.classList.contains('collapsed'));
+  _sugApply(_sugOpen);
 }
 
 function addBadge(parent,text,cls) {
@@ -8811,10 +9023,11 @@ function buildGeometryLine(cutAngle,pocketInfo) {
   }
   if (cutAngle<50) {
     let l=`${cutAngle}° is a meaningful cut — aim for the far edge of the object ball. `;
-    l+=pocketInfo?.corner?'Corner pocket: a touch of low inside english can help hold the line. ':'Side pocket: dead-center aim, no extras. ';
+    /* Spin tips are an Advanced subject; Simple gets the pocket fact alone. */
+    l+=pocketInfo?.corner?(simpleMode?'The corner pocket is the forgiving one. ':'Corner pocket: a touch of low inside english can help hold the line. '):'Side pocket: dead-center aim, no extras. ';
     return l;
   }
-  if (cutAngle<65) return `Hard cut at ${cutAngle}° — you\'re barely grazing the object ball. Any unwanted spin or miscue will throw it offline. Stay smooth and stay down. `+(pocketInfo?.corner?'Running english off the corner can save position. ':'Consider whether a safety gives you more. ');
+  if (cutAngle<65) return `Hard cut at ${cutAngle}° — you\'re barely grazing the object ball. Any unwanted spin or miscue will throw it offline. Stay smooth and stay down. `+(pocketInfo?.corner?(simpleMode?'':'Running english off the corner can save position. '):'Consider whether a safety gives you more. ');
   return `${cutAngle}° is an extreme cut — very low percentage. The contact point is almost at the edge of the ball. Unless you\'re desperate, a well-played safety is the smarter call here. `;
 }
 
@@ -8834,6 +9047,23 @@ function buildPositionLine(cutAngle) {
      Two different claims about where the white goes is how a strong player
      decides a tool is guessing. */
   var r = window._cueRead;
+  /* SIMPLE MODE says the same solved thing in plain words. It used to talk
+     about "the white line" and "the stun path" - but the white line is an
+     Advanced overlay, so Simple was pointing at something that is not on the
+     screen, in vocabulary a new player has not met yet. */
+  if (r && !r.tooThin && simpleMode) {
+    if (r.scratch) {
+      return 'hit the cue ball dead centre and it runs into the ' + (r.scratch.corner ? 'corner' : 'side')
+           + ' pocket \u2014 see the warning below. Hit it higher or lower to send it somewhere else.';
+    }
+    if (r.nearFull) {
+      return 'almost straight \u2014 hit centre and the cue ball stops about where it lands. Hit it high and '
+           + 'it rolls on; hit it low and it comes back.';
+    }
+    return 'after the hit the cue ball goes off sideways '
+         + (r.stoppedOn ? 'and runs into another ball' : 'toward the cushion')
+         + '. Hit it high and it travels further forward; hit it low and it holds back.';
+  }
   if (r && !r.tooThin) {
     if (r.scratch) {
       return 'a stun shot puts the cue ball in the ' + (r.scratch.corner ? 'corner' : 'side')
@@ -8847,6 +9077,11 @@ function buildPositionLine(cutAngle) {
          + (r.stoppedOn ? 'runs into another ball before it reaches a cushion'
                         : 'carries on to the cushion')
          + '. Follow sends it forward of that line, draw holds it behind.';
+  }
+  if (simpleMode) {
+    if (cutAngle<15) return 'Position tip: hit the cue ball high and it rolls on up the table; hit it low and it comes back toward you. Pick your next ball first.';
+    if (cutAngle<55) return 'Position tip: a centre hit keeps the cue ball closest to the middle of the table. Pick your next ball first.';
+    return 'Position tip: on a cut this thin the cue ball keeps most of its speed and travels a long way. Hit it softly.';
   }
   if (cutAngle<15) return 'Position tip: follow shot sends the cue ball straight up the table. Draw brings it back toward you. Pick your next ball first.';
   if (cutAngle<35) return 'Position tip: a touch of follow narrows your angle off the rail. Stun keeps you closer to the center of the table.';
@@ -9494,7 +9729,7 @@ function restoreShot(i) {
     /* The thumbnail is a FLATTENED picture - photo plus lines already drawn in.
        The homography cannot be rebuilt from it, so alignment is cleared rather
        than left pointing at geometry that no longer matches. */
-    window._tableH = null; window._tHf = null; window._tHinv = null; window._tCanonLong = null;
+    window._tableH = null; window._tHf = null; window._tHinv = null; window._tCanonLong = null; window._tLongFlip = false;
     hideSuggestion();
     if (typeof renderCanvas === 'function') renderCanvas();
     /* The canvas starts display:none and only the capture/upload/sample paths
@@ -9703,9 +9938,17 @@ var scoreMode = false;
    was only ever set to false, so nothing could ever open the screen. The row
    was taken off the hub and - unlike Shot History, which moved to Saved Reads
    on the Scan page - never given another way in. */
+/* The scoreboard always shows two players, so it has to RUN as two players.
+   Opened from the hub it was still in one-player mode: PASS TURN returned
+   early and the 8-ball group buttons set nothing - two dead controls on a
+   screen with five. Switch two-player on for the visit and put the player's
+   own setting back on the way out, the same way Table Mode borrows auto-scan. */
+var _sbPrevTwoPlayer = null;
 function enterScoreboard() {
   if (scoreMode) return;
   scoreMode = true;
+  _sbPrevTwoPlayer = twoPlayer;
+  twoPlayer = true;
   document.body.classList.add('score-mode');
   acquireWakeLock();        // it sits facing the table; it must not dim
   syncPlayersUI();
@@ -9716,6 +9959,8 @@ function exitScoreboard() {
   if (!scoreMode) return;
   scoreMode = false;
   document.body.classList.remove('score-mode');
+  if (_sbPrevTwoPlayer === false) { twoPlayer = false; activePlayer = 0; }
+  _sbPrevTwoPlayer = null;
   if (!tableMode) releaseWakeLock();   // Table Mode may still want it
   syncPlayersUI();
   openHub();                 // every destination returns to the menu
@@ -9755,8 +10000,13 @@ function renderScoreboard() {
     } else {
       var g = pl.group === 'solids' ? 'SOLIDS' : pl.group === 'stripes' ? 'STRIPES' : 'OPEN TABLE';
       var gc = pl.group === 'all' ? 'var(--text-dim)' : (on ? '#5df0a5' : 'var(--cream)');
-      mid = '<div><div class="sb-group" style="color:' + gc + '">' + g + '</div>'
-          + '<div class="sb-unit" style="margin-top:4px">' + (pl.group === 'all' ? 'GROUPS NOT SET YET' : 'YOUR GROUP') + '</div></div>';
+      /* 8-ball showed the groups and nothing else, so a race to five had
+         nowhere to live. Games won is the big number, like racks in 9-ball;
+         the group sits beside it. */
+      mid = '<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px">'
+          + '<div class="sb-big" style="color:' + (on ? '#5df0a5' : 'var(--cream)') + '">' + pl.racks + '</div>'
+          + '<div style="text-align:right;min-width:0"><div class="sb-group" style="color:' + gc + '">' + g + '</div>'
+          + '<div class="sb-unit" style="margin-top:4px">GAME' + (pl.racks === 1 ? '' : 'S') + ' WON</div></div></div>';
     }
     var named = !!(players[i].name && players[i].name.trim());
     html += '<div class="sb-panel" style="background:' + (on ? '#12271a' : 'var(--surface)')
@@ -9793,9 +10043,14 @@ function renderScoreboard() {
         '<button onclick="addRack(0);renderScoreboard()" style="background:#0d2e1c;color:#5df0a5;border:1px solid #34c96a">+1 ' + playerName(0).toUpperCase() + '</button>' +
         '<button onclick="addRack(1);renderScoreboard()" style="background:#0d2e1c;color:#5df0a5;border:1px solid #34c96a">+1 ' + playerName(1).toUpperCase() + '</button>';
     } else {
+      /* Group buttons act on whoever is at the table (the turn bar names
+         them); the +1 buttons name their player because a game can be won by
+         either one on any shot. */
       taps.innerHTML =
-        '<button onclick="setGroupFilter(\'solids\',null);renderScoreboard()" style="background:#0b1811;color:var(--cream);border:1px solid var(--border)">' + playerName(activePlayer).toUpperCase() + ' = SOLIDS</button>' +
-        '<button onclick="setGroupFilter(\'stripes\',null);renderScoreboard()" style="background:#0b1811;color:var(--cream);border:1px solid var(--border)">' + playerName(activePlayer).toUpperCase() + ' = STRIPES</button>';
+        '<button onclick="setGroupFilter(\'solids\',null);renderScoreboard()" style="background:#0b1811;color:var(--cream);border:1px solid var(--border)">▶ SOLIDS</button>' +
+        '<button onclick="setGroupFilter(\'stripes\',null);renderScoreboard()" style="background:#0b1811;color:var(--cream);border:1px solid var(--border)">▶ STRIPES</button>' +
+        '<button onclick="addRack(0);renderScoreboard()" style="background:#0d2e1c;color:#5df0a5;border:1px solid #34c96a">+1 ' + playerName(0).toUpperCase() + '</button>' +
+        '<button onclick="addRack(1);renderScoreboard()" style="background:#0d2e1c;color:#5df0a5;border:1px solid #34c96a">+1 ' + playerName(1).toUpperCase() + '</button>';
     }
   }
 }
@@ -9949,8 +10204,18 @@ function syncPlayersUI() {
 
 function addRack(i) {
   players[i].racks++;
+  /* A new 8-ball game starts on an open table: nobody owns a group until a
+     ball drops, so last game's solids and stripes must not carry over. */
+  if (gameMode === '8ball') {
+    players[0].group = 'all'; players[1].group = 'all'; groupFilter = 'all';
+    ['grp-all','grp-solids','grp-stripes'].forEach(function(id){
+      var b = document.getElementById(id);
+      if (b) b.classList.toggle('active', id === 'grp-all');
+    });
+    if (typeof updateGroupFilterDesc === 'function') updateGroupFilterDesc();
+  }
   syncPlayersUI(); saveSettings();
-  setStatus(playerName(i) + ' wins the rack \u2014 ' + players[i].racks + ' total', 'live');
+  setStatus(playerName(i) + ' wins the ' + (gameMode === '8ball' ? 'game' : 'rack') + '\u2014 ' + players[i].racks + ' total', 'live');
 }
 
 
@@ -10048,7 +10313,7 @@ function startSampleShot() {
   img.onload = function() {
     if (typeof cameraOn !== 'undefined' && cameraOn && typeof stopCamera === 'function') stopCamera();
     sourceImg = img; marks = []; aligning = false;
-    window._tableH = null; window._tHf = null; window._tHinv = null; window._tCanonLong = null;
+    window._tableH = null; window._tHf = null; window._tHinv = null; window._tCanonLong = null; window._tLongFlip = false;
     _pickingLowest = false; window._pendingPocketRemove = null;
     _sampleMode = true;
     viewMode = 'overhead'; if (typeof syncViewPills === 'function') syncViewPills();
@@ -10233,7 +10498,23 @@ function syncConf(val) {
      found nothing on every call. The sticky pair is the only one now. */
   var b=document.getElementById('conf-slider-sticky'), bv=document.getElementById('conf-val-sticky');
   if (b) b.value = val; if (bv) bv.textContent = val+'%';
+  var cv = document.getElementById('conf-chip-val'); if (cv) cv.textContent = val+'%';
   if (typeof saveSettings === 'function') saveSettings();
+}
+/* The AI Confidence drawer. force=true opens it, force=false closes it, no
+   argument toggles. The page reserves space under itself for this bar, so the
+   reserve is re-measured whenever the bar changes height. */
+function toggleConfDrawer(force) {
+  var d = document.getElementById('conf-drawer'), c = document.getElementById('conf-chip');
+  if (!d) return;
+  var open = (typeof force === 'boolean') ? force : (d.style.display === 'none');
+  d.style.display = open ? 'flex' : 'none';
+  if (c) {
+    c.setAttribute('aria-expanded', open ? 'true' : 'false');
+    c.style.background = open ? 'var(--gold)' : 'rgba(14,30,21,.92)';
+    c.style.color = open ? 'var(--felt)' : 'var(--gold)';
+  }
+  if (typeof syncStickyReserve === 'function') syncStickyReserve();
 }
 function toggleManualMark() {
   var b = document.getElementById('manual-mark-body'), c = document.getElementById('manual-mark-caret');
@@ -10272,7 +10553,7 @@ function undoMark() {
     // Undoing the alignment: remove the whole box + its auto-pockets as one unit,
     // so we never leave a half-broken 3-corner box or 5 auto-pockets behind.
     marks = marks.filter(m => m.type !== 'corner' && !m.fromBox);
-    window._tableH = null; window._tHf = null; window._tHinv = null; window._tCanonLong = null;
+    window._tableH = null; window._tHf = null; window._tHinv = null; window._tCanonLong = null; window._tLongFlip = false;
     setStatus('Table alignment removed','gold');
   } else {
     marks.pop();
@@ -10282,7 +10563,7 @@ function undoMark() {
 }
 
 function clearMarks() {
-  marks=[]; aligning=false; window._tableH=null; window._tHf=null; window._tHinv=null; window._tCanonLong=null;
+  marks=[]; aligning=false; window._tableH=null; window._tHf=null; window._tHinv=null; window._tCanonLong=null; window._tLongFlip=false;
   _pickingLowest=false; window._pendingPocketRemove=null;
   if (sourceImg) renderCanvas(); hideSuggestion();
   document.getElementById('detections-box').classList.remove('show');
@@ -10291,7 +10572,7 @@ function clearMarks() {
 
 function discardFrame() {
   var _qr = document.getElementById('quickmode-row'); if (_qr) _qr.style.display='none';
-  marks=[]; sourceImg=null; aligning=false; window._tableH=null; window._tHf=null; window._tHinv=null; window._tCanonLong=null;
+  marks=[]; sourceImg=null; aligning=false; window._tableH=null; window._tHf=null; window._tHinv=null; window._tCanonLong=null; window._tLongFlip=false;
   _pickingLowest=false; window._pendingPocketRemove=null; _sampleMode=false;
   ctx.clearRect(0,0,canvas.width,canvas.height);
   canvas.style.display='none'; placeholder.style.display='';
@@ -10601,7 +10882,9 @@ function saveSettings() {
       autoscan:  document.getElementById('autoscan-toggle').checked,
       personCheck: (document.getElementById('personcheck-toggle')||{checked:true}).checked,
       tableSize: TABLE_SIZE,
-      twoPlayer: twoPlayer,
+      /* While the scoreboard is borrowing two-player mode, save the player's
+         OWN setting - or a reload mid-scoreboard would make it permanent. */
+      twoPlayer: (typeof _sbPrevTwoPlayer === 'boolean') ? _sbPrevTwoPlayer : twoPlayer,
       activePlayer: activePlayer,
       players: players,
       diamonds: (document.getElementById('aim-diamonds')||{checked:false}).checked,
@@ -10738,8 +11021,11 @@ function renderRecovery(kind) {
   if (!kind) { b.classList.remove('recover'); fix.style.display = 'none';
                try { refreshTableMuteChip(); } catch (_) {} return; }   // mute chip may return
   b.classList.add('recover');
+  /* Something broke - the camera view and the fix button matter now, not a
+     full-screen copy of the last read. */
+  document.body.classList.remove('tm-read');
   try { refreshTableMuteChip(); } catch (_) {}                          // ...and must yield now
-  if (c) c.textContent = '\u2013';
+  if (c) { c.textContent = '\u2013'; c.style.color = ''; }
   fix.style.display = 'block';
   if (kind === 'camera') {
     t.textContent = 'Camera stopped';
@@ -10911,6 +11197,8 @@ function leaveTableMode() {
   if (!tableMode) return;
   tableMode = false;
   document.body.classList.remove('table-mode');
+  document.body.classList.remove('tm-read');   // class AND flag, or the next screen inherits it
+  _tmLive = false;
   if (_prevAutoScan !== null) {
     autoScan = _prevAutoScan;
     var t = document.getElementById('autoscan-toggle');
@@ -10963,6 +11251,15 @@ function tableModeUnmute() {
 
 /* Fill the banner from the crowned shot. Called at the end of suggestShot;
    returns immediately when Table Mode is off, so it costs nothing normally. */
+/* Live camera or the big read. The read is the default the moment there is
+   one; LIVE VIEW is for aiming the phone, and the choice lasts until the
+   player changes it back or leaves Table Mode. */
+var _tmLive = false;
+function tableModeToggleView() {
+  _tmLive = !_tmLive;
+  updateTableBanner();
+}
+
 function updateTableBanner() {
   if (!tableMode) return;
   refreshTableMuteChip();
@@ -10974,19 +11271,31 @@ function updateTableBanner() {
   var res = window._bestShotResult;
   var top = (res && res.ranked && res.ranked.length) ? res.ranked[0] : null;
 
+  var elL = document.getElementById('tm-conf-lbl');
+  var elV = document.getElementById('tm-view');
   if (!top || !top.ball) {
     elT.textContent = 'Looking for a shot\u2026';
     elA.textContent = 'Keep the whole table in view.';
-    elC.textContent = '\u2013';
+    elC.textContent = '\u2013'; elC.style.color = '';
+    if (elL) { elL.textContent = 'DIFFICULTY'; elL.style.color = ''; }
+    if (elV) elV.style.display = 'none';
+    document.body.classList.remove('tm-read');
     return;
   }
 
   var names = { obj:'Solid', stripe:'Stripe', eight:'8-ball' };
   var ball  = names[top.ball.type] || 'Ball';
   var where = top.pocket ? (getPocketType(top.pocket).label || 'pocket') : 'pocket';
+  /* "Corner" and "Side" are the words; "pocket" after them is only length,
+     and length is what forces a third line at this size. */
+  where = where.replace(/ Pocket$/, '');
   var d     = (typeof top.difficulty === 'number') ? top.difficulty : 5;
 
-  elT.textContent = top.blocked ? (ball + ' \u2014 blocked') : (ball + ' \u2192 ' + where);
+  /* Name the ball the way the picture does. With more than one of a kind the
+     label printed on it (S2, T1) is the only thing that says WHICH. The line
+     break only shows in the big read, where the title is set pre-line. */
+  var lbl = (top.ball._lbl && top.ball._lbl.length > 1) ? (' ' + top.ball._lbl) : '';
+  elT.textContent = top.blocked ? (ball + lbl + ' \u2014\nblocked') : (ball + lbl + '\n\u2192 ' + where);
   elA.textContent = top.blocked
     ? 'No clear path. Check the kick or combo option.'
     : (d <= 3 ? 'Good shot. Step in with confidence.'
@@ -10996,7 +11305,31 @@ function updateTableBanner() {
 
   /* "Sure" is makeability, not model confidence: difficulty 1 reads 95%,
      difficulty 10 reads 5%. Never 0 or 100 - neither is ever honest. */
-  elC.textContent = Math.max(5, Math.min(95, Math.round(105 - d * 10))) + '%';
+  /* It now shows the difficulty itself - the same n/10 the Scan page shows -
+     rather than a percentage derived from it. "85% sure" read as a promise
+     about the shot going in, which nothing here measures. */
+  var dCol = d <= 3 ? '#34c96a' : d <= 6 ? '#e08820' : '#ff6b5a';
+  elC.textContent = d + '/10'; elC.style.color = dCol;
+  if (elL) {
+    elL.textContent = d <= 3 ? 'EASY' : d <= 5 ? 'MODERATE' : d <= 7 ? 'DIFFICULT' : 'VERY DIFFICULT';
+    elL.style.color = dCol;
+  }
+
+  /* THE BIG READ. Reuses what the Scan page already drew: the canvas (frame,
+     labels, crown and aim line) and the contact-point ball. Nothing is
+     calculated a second time here. */
+  try {
+    var img = document.getElementById('tm-shot');
+    if (img && typeof canvas !== 'undefined' && canvas && canvas.width) img.src = canvas.toDataURL('image/jpeg', 0.82);
+    var key = document.getElementById('tm-key'), ck = document.getElementById('contact-key');
+    if (key) key.innerHTML = (ck && ck.style.display !== 'none' && ck.innerHTML)
+      ? ck.innerHTML.replace(/ckclip/g, 'ckclip-tm') : '';
+  } catch (_) {}
+  if (elV) {
+    elV.style.display = 'inline-flex';
+    elV.innerHTML = _tmLive ? '&#127919; SHOW READ' : '&#128247; LIVE VIEW';
+  }
+  document.body.classList.toggle('tm-read', !_tmLive);
 
   speakShot(buildSpokenSummary());   // silent unless chime-toggle is on
 }
@@ -11280,7 +11613,7 @@ var TOUR_STEPS = [
   { sel:'#auto-align-btn', n:'2 · Line up the table', d:'Tap ✨ AUTO and the app finds the table for you — that is the normal path. Only use “📐 Align Table by hand” underneath if Auto cannot see the corners.' },
   { sel:'#step3-anchor', n:'3 · Check the balls', d:'The AI finds the balls automatically. If one is labeled wrong, just tap it until it\u2019s right.' },
   { sel:'#step4-anchor', n:'4 · Game & shot', d:'The checklist before you tap Suggest Best Shot: cue ball marked, at least one object ball, and a pocket.' },
-  { sel:'.sticky-action-bar', n:'Then: Suggest Best Shot', d:'With a cue ball, an object ball and a pocket set, tap Suggest Best Shot in this bar. The AI Confidence slider lives here too \u2014 slide left if balls were missed, right if it marked things that aren\u2019t balls.' }
+  { sel:'.sticky-action-bar', n:'Then: Suggest Best Shot', d:'With a cue ball, an object ball and a pocket set, tap Suggest Best Shot in this bar. Tap the \ud83c\udf9a\ufe0f button beside it to open the AI Confidence slider \u2014 slide left if balls were missed, right if it marked things that aren\u2019t balls.' }
 ];
 var _tourIdx = 0;
 function showWelcome(){ var o=document.getElementById('welcome-overlay'); if(o) o.classList.add('show'); }
@@ -11787,7 +12120,7 @@ try {
         </div>
         <div class="help-item">
           <div class="help-icon">🎚️</div>
-          <div><div class="help-item-title">AI Confidence Slider</div><div class="help-item-desc">Think in symptoms, not percentages — the labels under the slider say it: <strong>Missed some balls? Slide left</strong>. <strong>Marked things that aren&rsquo;t balls? Slide right</strong>. Left makes the AI bolder (finds more, guesses more), right makes it stricter (only what it&rsquo;s sure of).</div></div>
+          <div><div class="help-item-title">AI Confidence Slider</div><div class="help-item-desc">Tap the <strong>🎚️ button</strong> beside AI Detect to open it. Think in symptoms, not percentages — the labels under the slider say it: <strong>Missed some balls? Slide left</strong>. <strong>Marked things that aren&rsquo;t balls? Slide right</strong>. Left makes the AI bolder (finds more, guesses more), right makes it stricter (only what it&rsquo;s sure of).</div></div>
         </div>
         <div class="help-item">
           <div class="help-icon">✋</div>
