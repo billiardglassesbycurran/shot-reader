@@ -1139,6 +1139,48 @@ input[type=range]::-moz-range-thumb {
 .sb-rn-btns button{ flex:1; min-height:46px; border-radius:10px; cursor:pointer;
   font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:15px; letter-spacing:.5px; }
 
+/* GAME BUTTON. The header line names the game and the target and is the way
+   into the setup sheet, so it is a real 44px button rather than a label. */
+#sb-context{ display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  min-height:44px; margin-top:4px; padding:0 14px; cursor:pointer;
+  background:#0b1811; border:1px solid var(--gold-dim); border-radius:22px;
+  font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.8px;
+  font-size: clamp(13px, 3.8vw, 15px); color: var(--gold-lt); white-space:nowrap; max-width:100%; }
+#sb-undo{ flex:0 0 auto; min-height:56px; min-width:84px; padding:0 12px; cursor:pointer;
+  background:#0b1811; color:var(--text-dim); border:1px solid var(--border); border-radius:12px;
+  font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.5px;
+  font-size: clamp(14px,4vw,17px); }
+#sb-undo:disabled{ opacity:.35; cursor:default; }
+.sb-games{ display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.sb-games button, .sb-step button{ min-height:46px; border-radius:10px; cursor:pointer;
+  background:#0b1811; color:var(--cream); border:1px solid var(--border);
+  font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:15px; letter-spacing:.5px; }
+.sb-games button.on{ background:#12271a; color:#5df0a5; border:2px solid var(--green-soft); }
+.sb-lbl{ font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:12px;
+  letter-spacing:1px; color:var(--text-muted); margin:14px 0 6px; }
+.sb-step{ display:flex; align-items:center; gap:10px; }
+.sb-step button{ flex:0 0 52px; font-size:22px; }
+.sb-step .val{ flex:1; text-align:center; font-family:'Barlow Condensed',sans-serif; font-weight:700;
+  font-size:26px; color:var(--cream); line-height:1.1; }
+.sb-step .val small{ display:block; font-size:12px; letter-spacing:1px; color:var(--text-muted); }
+.sb-note{ font-size:12px; color:var(--text-muted); line-height:1.4; margin-top:8px; }
+.sb-rn-card{ max-height:92vh; max-height:92dvh; overflow-y:auto; }
+/* WINNER */
+.sb-win .sb-rn-card{ text-align:center; }
+.sb-win .cup{ font-size:52px; line-height:1; }
+.sb-win .who{ font-family:'Barlow Condensed',sans-serif; font-weight:700; color:#5df0a5;
+  font-size: clamp(30px, 10vw, 44px); line-height:1.05; margin-top:6px; overflow-wrap:anywhere; }
+.sb-win .line{ font-family:'Barlow Condensed',sans-serif; font-weight:700; color:var(--cream);
+  font-size: clamp(22px, 7vw, 30px); margin-top:4px; }
+.sb-win .sb-rn-btns{ flex-direction:column; }
+@media (orientation: landscape) and (max-height: 500px) {
+  #sb-context{ margin-top:0; min-height:44px; }
+  #sb-undo{ min-height:48px; min-width:64px; }
+  .sb-win .cup{ font-size:34px; }
+  .sb-win .sb-rn-btns{ flex-direction:row; }
+  .sb-games{ grid-template-columns:1fr 1fr 1fr; }
+}
+
 #sb-hint{ text-align:center; font-family:'Barlow Condensed',sans-serif; letter-spacing:.5px;
   font-size: clamp(11px,3.1vw,13px); color:var(--gold-lt); opacity:.92; margin-top:7px; flex-shrink:0;
   background:rgba(200,151,46,.10); border:1px solid rgba(200,151,46,.28); border-radius:8px;
@@ -1894,8 +1936,7 @@ body.score-mode #scoreboard {
 #sb-head { text-align: center; flex-shrink: 0; }
 #sb-title { font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:1px;
             font-size: clamp(14px, 4vw, 17px); color: var(--gold-bright); }
-#sb-context { font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:.8px;
-              font-size: clamp(10px, 3vw, 12px); color: var(--text-muted); margin-top: 3px; }
+/* #sb-context is now the game button; its look is set once, with #sb-undo. */
 
 /* Turn bar and panels: identical across all three games. Only the middle
    content block inside a panel changes with game mode. */
@@ -1967,12 +2008,21 @@ body.score-mode #scoreboard {
   /* Three stacked control rows cost 156px of the 375 available. On one line
      they cost 56, which is what finally makes the panels fit. */
   #sb-controls { flex-direction: row; align-items: stretch; gap: 8px; margin-top: 8px; }
-  #sb-controls > div:first-child { margin-top: 0 !important; flex: 0 0 34%; }
+  #sb-controls > div:first-child { margin-top: 0 !important; flex: 0 0 30%; }
+  /* Seven controls on one row cut every label short and pushed EXIT off an
+     iPhone SE. In landscape EXIT moves to the top-right corner, and the hint
+     line steps aside to make room - the pencil marks on the names and on the
+     game button still say they can be tapped. */
+  #sb-hint { display: none; }
+  body.score-mode #sb-exit {
+    position: absolute; top: calc(8px + env(safe-area-inset-top, 0px));
+    right: calc(16px + env(safe-area-inset-right, 0px)); min-height: 44px; }
+  #sb-head { padding-right: 150px; }
   #sb-pass { min-height: 48px; font-size: clamp(14px, 2.4vw, 17px); }
   #sb-taps { margin-top: 0; flex: 1 1 auto; flex-wrap: nowrap; }
   #sb-taps button { min-height: 48px; flex: 1 1 0; font-size: clamp(11px, 1.8vw, 15px); }
   #sb-warn { margin-top: 6px; padding: 6px 8px; }
-  #sb-exit { margin-top: 0; min-height: 48px; padding: 0 14px; flex: 0 0 auto; align-self: stretch; }
+  #sb-exit { margin-top: 0; padding: 0 14px; }
 }
 
 /* ═══ MODES HUB ══════════════════════════════════════════════════════
@@ -2290,7 +2340,7 @@ body.hist-mode #history-panel {
       <div class="hdr-emblem">🎱</div>
       <div style="flex:1">
         <div class="hdr-name"><span>Curran&rsquo;s Shot Reader</span></div>
-        <div class="hdr-sub">See the table. Read the shot. <span style="color:var(--gold-dim);opacity:.7">· V11.17.0634</span></div>
+        <div class="hdr-sub">See the table. Read the shot. <span style="color:var(--gold-dim);opacity:.7">· V11.17.0859</span></div>
       </div>
       <div style="flex:1 1 100%;display:flex;gap:6px;justify-content:flex-end;margin-top:7px">
         <button class="help-btn" id="hdr-tour-btn" onclick="showWelcome()" title="Welcome tour"><span style="font-size:14px">👋</span> Tour</button>
@@ -9622,6 +9672,12 @@ function loadHistory() {
     var raw = localStorage.getItem(HIST_KEY);
     shotHistory = raw ? (JSON.parse(raw) || []) : [];
     if (!Array.isArray(shotHistory)) shotHistory = [];
+    /* A saved read is only usable with its picture and its marks. One damaged
+       entry (an interrupted write, an older version's format) used to stop the
+       whole Saved Reads panel from opening, and Save with it. */
+    shotHistory = shotHistory.filter(function (h) {
+      return h && typeof h === 'object' && typeof h.thumb === 'string' && Array.isArray(h.marks);
+    });
   } catch (e) { shotHistory = []; }
 }
 
@@ -9880,16 +9936,13 @@ function refreshHubState() {
   var s = document.getElementById('hub-s-score');
   if (s) {
     var line;
-    if (!twoPlayer) {
-      line = 'Solo · ' + (gameMode === 'straight' ? players[0].score + ' points'
-                             : gameMode === '9ball'   ? players[0].racks + ' racks'
-                             : 'keep score in big numbers');
-    } else if (gameMode === 'straight') {
-      line = playerName(0) + ' ' + players[0].score + ' · ' + playerName(1) + ' ' + players[1].score;
-    } else if (gameMode === '9ball') {
-      line = playerName(0) + ' ' + players[0].racks + ' · ' + playerName(1) + ' ' + players[1].racks;
+    if (!SB_GAMES[sbGame]) {
+      line = '8-ball, 9-ball, 10-ball, straight pool, one-pocket and bank pool';
     } else {
-      line = playerName(0) + ' vs ' + playerName(1);
+      var dd = sbDef(), g = dd.name.charAt(0) + dd.name.slice(1).toLowerCase();
+      line = (sbVal(0) || sbVal(1))
+        ? g + ' \u00b7 ' + playerName(0) + ' ' + sbVal(0) + ', ' + playerName(1) + ' ' + sbVal(1)
+        : g + ' \u00b7 ' + sbHeadline().split(' \u00b7 ')[1].toLowerCase();
     }
     s.textContent = line;
   }
@@ -10003,12 +10056,198 @@ var scoreMode = false;
    early and the 8-ball group buttons set nothing - two dead controls on a
    screen with five. Switch two-player on for the visit and put the player's
    own setting back on the way out, the same way Table Mode borrows auto-scan. */
+/* ── SCOREBOARD GAMES ──────────────────────────────────────────────────
+   The scoreboard keeps its OWN game, separate from the shot reader's
+   gameMode: the reader only knows 8-ball, 9-ball and straight pool, and
+   picking 10-ball or one-pocket here must not change how shots are read.
+   Two kinds of scoring:
+     racks  - each game won is +1; first to the race wins the match.
+     points - every ball counts; first to the target wins.
+   Targets are the common defaults and can be changed in the setup sheet. */
+var SB_GAMES = {
+  '8ball':     { name:'8-BALL',        kind:'racks',  race:5,   unit:'GAME' },
+  '9ball':     { name:'9-BALL',        kind:'racks',  race:7,   unit:'RACK' },
+  '10ball':    { name:'10-BALL',       kind:'racks',  race:7,   unit:'RACK' },
+  'straight':  { name:'STRAIGHT POOL', kind:'points', race:100, unit:'POINT' },
+  'onepocket': { name:'ONE-POCKET',    kind:'points', race:8,   unit:'BALL' },
+  'bank':      { name:'BANK POOL',     kind:'points', race:8,   unit:'BALL' }
+};
+var SB_ORDER = ['8ball', '9ball', '10ball', 'straight', 'onepocket', 'bank'];
+var sbGame = null;          // set on first visit from the reader's game
+var sbRace = {};            // the player's own targets, per game
+var _sbHist = [];           // snapshots for UNDO
+var _sbWinShown = false;    // the winner screen shows once per win
+function sbDef() { return SB_GAMES[sbGame] || SB_GAMES['8ball']; }
+function sbTarget() { var t = sbRace[sbGame]; return (typeof t === 'number' && t > 0) ? t : sbDef().race; }
+function sbVal(i) { return sbDef().kind === 'racks' ? players[i].racks : players[i].score; }
+function sbTargetWords(n) {
+  var d = sbDef(), u = d.unit.toLowerCase();
+  return n + ' ' + u + (n === 1 ? '' : 's');
+}
+function sbHeadline() {
+  var d = sbDef(), t = sbTarget();
+  /* "Race to" is what players say for racks and for straight pool; the
+     ball-count games are "first to". */
+  return d.name + ' \u00b7 ' + ((d.kind === 'racks' || sbGame === 'straight') ? 'RACE TO ' : 'FIRST TO ') + t;
+}
+
+/* UNDO. A tap at a bar table is easy to get wrong, and the board is the only
+   record of the match, so every change can be taken back. */
+function sbSnap() {
+  _sbHist.push(JSON.stringify({ p: players, a: activePlayer, g: groupFilter, f: (typeof _foulStreak === 'number') ? _foulStreak : 0 }));
+  if (_sbHist.length > 60) _sbHist.shift();
+}
+function sbUndo() {
+  if (!_sbHist.length) return;
+  var s = JSON.parse(_sbHist.pop());
+  for (var i = 0; i < 2; i++) Object.assign(players[i], s.p[i]);
+  activePlayer = s.a; groupFilter = s.g;
+  if (typeof _foulStreak === 'number') _foulStreak = s.f;
+  _sbCloseOverlays();
+  if (sbVal(0) < sbTarget() && sbVal(1) < sbTarget()) _sbWinShown = false;
+  syncPlayersUI(); saveSettings(); renderScoreboard();
+  setStatus('Last tap undone', 'gold');
+}
+function _sbCloseOverlays() {
+  ['sb-setup', 'sb-winner'].forEach(function (id) { var e = document.getElementById(id); if (e) e.remove(); });
+}
+
+/* Scoring from the board. Each one snapshots first, so UNDO always works. */
+function sbAddRack(i) {
+  sbSnap();
+  players[i].racks++;
+  if (sbGame === '8ball') {
+    /* a new 8-ball game opens on an open table */
+    players[0].group = 'all'; players[1].group = 'all';
+    if (gameMode === '8ball') {
+      groupFilter = 'all';
+      ['grp-all','grp-solids','grp-stripes'].forEach(function(id){
+        var b = document.getElementById(id); if (b) b.classList.toggle('active', id === 'grp-all'); });
+      if (typeof updateGroupFilterDesc === 'function') updateGroupFilterDesc();
+    }
+  }
+  syncPlayersUI(); saveSettings();
+  setStatus(playerName(i) + ' wins the ' + sbDef().unit.toLowerCase() + ' \u2014 ' + players[i].racks + ' of ' + sbTarget(), 'live');
+  renderScoreboard(); sbCheckWin();
+}
+function sbSetGroup(val) {
+  sbSnap();
+  P().group = val;
+  players[activePlayer === 0 ? 1 : 0].group = (val === 'solids') ? 'stripes' : 'solids';
+  if (gameMode === '8ball') setGroupFilter(val, null);
+  syncPlayersUI(); saveSettings(); renderScoreboard();
+}
+function sbPoint(n) {
+  sbSnap();
+  if (sbGame === 'straight') {
+    bumpRun(n);                         // keeps the 14.1 three-foul rule
+  } else {
+    /* One-pocket and bank pool: a foul costs a ball (it is spotted), and the
+       count can go below zero - players call it "owing" a ball. */
+    var pl = P();
+    pl.score += n;
+    pl.fouls = n > 0 ? 0 : pl.fouls + 1;
+    setStatus((n > 0 ? '' : 'Foul \u2014 ') + playerName(activePlayer) + ': ' + pl.score + ' of ' + sbTarget(), n > 0 ? 'live' : 'warn');
+    saveSettings();
+  }
+  renderScoreboard(); sbCheckWin();
+}
+function sbCheckWin() {
+  if (_sbWinShown) return;
+  var t = sbTarget();
+  for (var i = 0; i < 2; i++) if (sbVal(i) >= t) { _sbWinShown = true; sbShowWinner(i); return; }
+}
+function sbShowWinner(i) {
+  _sbCloseOverlays();
+  var o = 1 - i;
+  var w = document.createElement('div');
+  w.id = 'sb-winner'; w.className = 'sb-rn sb-win';
+  w.innerHTML =
+    '<div class="sb-rn-card" role="dialog" aria-label="Match won">' +
+      '<div class="cup">&#127942;</div>' +
+      '<div class="who"></div>' +
+      '<div class="line">' + sbVal(i) + ' \u2013 ' + sbVal(o) + '</div>' +
+      '<div class="sb-note">' + sbDef().name.charAt(0) + sbDef().name.slice(1).toLowerCase() + ', ' + sbHeadline().split(' \u00b7 ')[1].toLowerCase() + '.</div>' +
+      '<div class="sb-rn-btns">' +
+        '<button onclick="sbNewMatch()" style="background:#0d2e1c;color:#5df0a5;border:1px solid #34c96a">NEW MATCH</button>' +
+        '<button onclick="sbUndo()" style="background:#1a2a1f;color:#cdddd0;border:1px solid var(--border)">&#8617; UNDO LAST TAP</button>' +
+        '<button onclick="_sbCloseOverlays()" style="background:none;color:var(--text-dim);border:1px solid var(--border)">KEEP SCORING</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(w);
+  w.querySelector('.who').textContent = playerName(i).toUpperCase() + ' WINS';
+  try { playChime('suggestion'); } catch (_) {}
+}
+function sbNewMatch() {
+  sbSnap();
+  players.forEach(function (x) { x.score = 0; x.fouls = 0; x.racks = 0; x.group = 'all'; });
+  if (typeof _foulStreak === 'number') _foulStreak = 0;
+  activePlayer = 0; _sbWinShown = false;
+  if (gameMode === '8ball') groupFilter = 'all';
+  _sbCloseOverlays();
+  syncPlayersUI(); saveSettings(); renderScoreboard();
+  setStatus('New match \u2014 ' + sbHeadline().toLowerCase(), 'gold');
+}
+
+/* SETUP SHEET: which game, how far, new match. */
+function openSbSetup() {
+  _sbCloseOverlays();
+  var w = document.createElement('div');
+  w.id = 'sb-setup'; w.className = 'sb-rn';
+  document.body.appendChild(w);
+  w.onclick = function (e) { if (e.target === w) _sbCloseOverlays(); };
+  sbRenderSetup();
+}
+function sbRenderSetup() {
+  var w = document.getElementById('sb-setup'); if (!w) return;
+  var t = sbTarget(), d = sbDef();
+  var games = SB_ORDER.map(function (k) {
+    return '<button class="' + (k === sbGame ? 'on' : '') + '" onclick="sbPickGame(\'' + k + '\')">' + SB_GAMES[k].name + '</button>';
+  }).join('');
+  var again = !!w.firstChild;     // re-render after a tap: do not replay the pop-in
+  w.innerHTML =
+    '<div class="sb-rn-card" role="dialog" aria-label="Game and match"' + (again ? ' style="animation:none"' : '') + '>' +
+      '<h4>&#127921; Game &amp; match</h4>' +
+      '<div class="sb-games">' + games + '</div>' +
+      '<div class="sb-note">Changing the game starts a new match. Names are kept.</div>' +
+      '<div class="sb-lbl">' + (d.kind === 'racks' || sbGame === 'straight' ? 'RACE TO' : 'FIRST TO') + '</div>' +
+      '<div class="sb-step">' +
+        '<button onclick="sbStep(-1)" aria-label="Lower">&minus;</button>' +
+        '<div class="val">' + t + '<small>' + sbTargetWords(t).replace(/^\d+ /, '').toUpperCase() + '</small></div>' +
+        '<button onclick="sbStep(1)" aria-label="Higher">+</button>' +
+      '</div>' +
+      '<div class="sb-rn-btns">' +
+        '<button onclick="sbNewMatch()" style="background:#2a1414;color:#ff9d7a;border:1px solid #7a3a2a">NEW MATCH</button>' +
+        '<button onclick="_sbCloseOverlays()" style="background:#0d2e1c;color:#5df0a5;border:1px solid #34c96a">DONE</button>' +
+      '</div>' +
+    '</div>';
+}
+function sbPickGame(k) {
+  if (!SB_GAMES[k] || k === sbGame) return;
+  var started = players.some(function (x) { return x.score || x.racks || x.fouls || (x.group && x.group !== 'all'); });
+  sbGame = k;
+  if (started) sbNewMatch(); else { _sbWinShown = false; saveSettings(); renderScoreboard(); }
+  if (!document.getElementById('sb-setup')) openSbSetup(); else sbRenderSetup();
+}
+function sbStep(dir) {
+  var d = sbDef(), t = sbTarget();
+  /* points races move in sensible jumps: 100 -> 125 -> 150 for straight pool */
+  var step = (sbGame === 'straight') ? 25 : 1;
+  var min = (sbGame === 'straight') ? 25 : 1, max = (sbGame === 'straight') ? 500 : 99;
+  t = Math.max(min, Math.min(max, t + dir * step));
+  sbRace[sbGame] = t;
+  if (sbVal(0) < t && sbVal(1) < t) _sbWinShown = false;
+  saveSettings(); renderScoreboard(); sbRenderSetup();
+}
+
 var _sbPrevTwoPlayer = null;
 function enterScoreboard() {
   if (scoreMode) return;
   scoreMode = true;
   _sbPrevTwoPlayer = twoPlayer;
   twoPlayer = true;
+  if (!SB_GAMES[sbGame]) sbGame = SB_GAMES[gameMode] ? gameMode : '8ball';
+  _sbHist = [];
   document.body.classList.add('score-mode');
   acquireWakeLock();        // it sits facing the table; it must not dim
   syncPlayersUI();
@@ -10019,6 +10258,7 @@ function exitScoreboard() {
   if (!scoreMode) return;
   scoreMode = false;
   document.body.classList.remove('score-mode');
+  _sbCloseOverlays();
   if (_sbPrevTwoPlayer === false) { twoPlayer = false; activePlayer = 0; }
   _sbPrevTwoPlayer = null;
   if (!tableMode) releaseWakeLock();   // Table Mode may still want it
@@ -10035,28 +10275,31 @@ function renderScoreboard() {
   var taps = document.getElementById('sb-taps');
   if (!box) return;
 
-  var GAME = { straight:'STRAIGHT POOL', '9ball':'9-BALL', '8ball':'8-BALL' };
-  if (ctx) ctx.textContent = (GAME[gameMode] || 'POOL')
-    + (gameMode === 'straight' ? '   \u00b7   RACE TO 100' : '');
+  var D = sbDef();
+  if (ctx) ctx.innerHTML = sbHeadline() + ' <span aria-hidden="true" style="opacity:.75">&#9998;</span>';
+  var ub = document.getElementById('sb-undo'); if (ub) ub.disabled = !_sbHist.length;
   if (turn) turn.innerHTML = playerName(activePlayer) + '&rsquo;s shot';
 
   var html = '';
   for (var i = 0; i < 2; i++) {
     var pl = players[i], on = (i === activePlayer);
     var mid = '';
-    if (gameMode === 'straight') {
-      var pips = '';
-      for (var k = 0; k < 2; k++)
+    if (D.kind === 'points') {
+      var pips = '', unitWord = (sbGame === 'straight') ? 'POINTS' : 'BALLS';
+      if (sbGame === 'straight') for (var k = 0; k < 2; k++)
         pips += '<div class="sb-pip' + (k < Math.min(pl.fouls,2) ? ' on' : '') + '"></div>';
       mid = '<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px">'
           + '<div class="sb-big" style="color:' + (on ? '#5df0a5' : 'var(--cream)') + '">' + pl.score + '</div>'
-          + '<div style="text-align:right"><div class="sb-unit">POINTS</div>'
-          + '<div style="display:flex;gap:6px;margin-top:8px">' + pips + '</div>'
-          + '<div class="sb-unit" style="margin-top:4px;color:' + (pl.fouls >= 2 ? '#ff9d7a' : 'var(--text-muted)') + '">FOULS</div></div></div>';
-    } else if (gameMode === '9ball') {
+          + '<div style="text-align:right"><div class="sb-unit">' + unitWord + ' OF ' + sbTarget() + '</div>'
+          + (sbGame === 'straight'
+              ? '<div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end">' + pips + '</div>'
+                + '<div class="sb-unit" style="margin-top:4px;color:' + (pl.fouls >= 2 ? '#ff9d7a' : 'var(--text-muted)') + '">FOULS</div>'
+              : '')
+          + '</div></div>';
+    } else if (sbGame !== '8ball') {
       mid = '<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px">'
           + '<div class="sb-big" style="color:' + (on ? '#5df0a5' : 'var(--cream)') + '">' + pl.racks + '</div>'
-          + '<div class="sb-unit" style="padding-bottom:8px">RACK' + (pl.racks === 1 ? '' : 'S') + ' WON</div></div>';
+          + '<div class="sb-unit" style="padding-bottom:8px">RACKS WON OF ' + sbTarget() + '</div></div>';
     } else {
       var g = pl.group === 'solids' ? 'SOLIDS' : pl.group === 'stripes' ? 'STRIPES' : 'OPEN TABLE';
       var gc = pl.group === 'all' ? 'var(--text-dim)' : (on ? '#5df0a5' : 'var(--cream)');
@@ -10066,7 +10309,7 @@ function renderScoreboard() {
       mid = '<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px">'
           + '<div class="sb-big" style="color:' + (on ? '#5df0a5' : 'var(--cream)') + '">' + pl.racks + '</div>'
           + '<div style="text-align:right;min-width:0"><div class="sb-group" style="color:' + gc + '">' + g + '</div>'
-          + '<div class="sb-unit" style="margin-top:4px">GAME' + (pl.racks === 1 ? '' : 'S') + ' WON</div></div></div>';
+          + '<div class="sb-unit" style="margin-top:4px">GAMES WON OF ' + sbTarget() + '</div></div></div>';
     }
     var named = !!(players[i].name && players[i].name.trim());
     html += '<div class="sb-panel" style="background:' + (on ? '#12271a' : 'var(--surface)')
@@ -10085,7 +10328,7 @@ function renderScoreboard() {
   // the two-foul warning is a WPA requirement, so it gets a banner of its own
   if (warn) {
     var p2 = players[activePlayer];
-    var show = (gameMode === 'straight' && p2.fouls >= 2);
+    var show = (sbGame === 'straight' && p2.fouls >= 2);
     warn.style.display = show ? 'block' : 'none';
     if (show) warn.textContent = '\u26a0  ' + playerName(activePlayer).toUpperCase()
       + ' \u2014 2 FOULS. A THIRD COSTS 16.';
@@ -10094,23 +10337,23 @@ function renderScoreboard() {
   /* Tap strip. Below PASS TURN deliberately: everything above is sized to be
      read across a table, and controls up there would crowd it. */
   if (taps) {
-    if (gameMode === 'straight') {
+    if (D.kind === 'points') {
       taps.innerHTML =
-        '<button onclick="bumpRun(-1);renderScoreboard()" style="background:#2a1414;color:#ff9d7a;border:1px solid #7a3a2a">&minus;1 FOUL</button>' +
-        '<button onclick="bumpRun(1);renderScoreboard()" style="background:#0d2e1c;color:#5df0a5;border:1px solid #34c96a">+1 BALL</button>';
-    } else if (gameMode === '9ball') {
+        '<button onclick="sbPoint(-1)" style="background:#2a1414;color:#ff9d7a;border:1px solid #7a3a2a">&minus;1 FOUL</button>' +
+        '<button onclick="sbPoint(1)" style="background:#0d2e1c;color:#5df0a5;border:1px solid #34c96a">+1 BALL</button>';
+    } else if (sbGame !== '8ball') {
       taps.innerHTML =
-        '<button onclick="addRack(0);renderScoreboard()" style="background:#0d2e1c;color:#5df0a5;border:1px solid #34c96a">+1 ' + playerName(0).toUpperCase() + '</button>' +
-        '<button onclick="addRack(1);renderScoreboard()" style="background:#0d2e1c;color:#5df0a5;border:1px solid #34c96a">+1 ' + playerName(1).toUpperCase() + '</button>';
+        '<button onclick="sbAddRack(0)" style="background:#0d2e1c;color:#5df0a5;border:1px solid #34c96a">+1 ' + playerName(0).toUpperCase() + '</button>' +
+        '<button onclick="sbAddRack(1)" style="background:#0d2e1c;color:#5df0a5;border:1px solid #34c96a">+1 ' + playerName(1).toUpperCase() + '</button>';
     } else {
       /* Group buttons act on whoever is at the table (the turn bar names
          them); the +1 buttons name their player because a game can be won by
          either one on any shot. */
       taps.innerHTML =
-        '<button onclick="setGroupFilter(\'solids\',null);renderScoreboard()" style="background:#0b1811;color:var(--cream);border:1px solid var(--border)">▶ SOLIDS</button>' +
-        '<button onclick="setGroupFilter(\'stripes\',null);renderScoreboard()" style="background:#0b1811;color:var(--cream);border:1px solid var(--border)">▶ STRIPES</button>' +
-        '<button onclick="addRack(0);renderScoreboard()" style="background:#0d2e1c;color:#5df0a5;border:1px solid #34c96a">+1 ' + playerName(0).toUpperCase() + '</button>' +
-        '<button onclick="addRack(1);renderScoreboard()" style="background:#0d2e1c;color:#5df0a5;border:1px solid #34c96a">+1 ' + playerName(1).toUpperCase() + '</button>';
+        '<button onclick="sbSetGroup(\'solids\')" style="background:#0b1811;color:var(--cream);border:1px solid var(--border)">▶ SOLIDS</button>' +
+        '<button onclick="sbSetGroup(\'stripes\')" style="background:#0b1811;color:var(--cream);border:1px solid var(--border)">▶ STRIPES</button>' +
+        '<button onclick="sbAddRack(0)" style="background:#0d2e1c;color:#5df0a5;border:1px solid #34c96a">+1 ' + playerName(0).toUpperCase() + '</button>' +
+        '<button onclick="sbAddRack(1)" style="background:#0d2e1c;color:#5df0a5;border:1px solid #34c96a">+1 ' + playerName(1).toUpperCase() + '</button>';
     }
   }
 }
@@ -10275,7 +10518,7 @@ function addRack(i) {
     if (typeof updateGroupFilterDesc === 'function') updateGroupFilterDesc();
   }
   syncPlayersUI(); saveSettings();
-  setStatus(playerName(i) + ' wins the ' + (gameMode === '8ball' ? 'game' : 'rack') + '\u2014 ' + players[i].racks + ' total', 'live');
+  setStatus(playerName(i) + ' wins the ' + (gameMode === '8ball' ? 'game' : 'rack') + ' \u2014 ' + players[i].racks + ' total', 'live');
 }
 
 
@@ -10459,7 +10702,7 @@ function setGame(mode,el) {
     if (p.closest && p.closest('#tablesize-row')) return;   // table size is separate
     p.classList.remove('active');
   });
-  el.classList.add('active'); hideSuggestion();
+  if (el) el.classList.add('active'); hideSuggestion();
   updateGroupFilterVisibility();
   saveSettings();
 }
@@ -10947,6 +11190,8 @@ function saveSettings() {
       twoPlayer: (typeof _sbPrevTwoPlayer === 'boolean') ? _sbPrevTwoPlayer : twoPlayer,
       activePlayer: activePlayer,
       players: players,
+      sbGame: sbGame,
+      sbRace: sbRace,
       diamonds: (document.getElementById('aim-diamonds')||{checked:false}).checked,
       sens:      document.getElementById('sens-slider').value,
       delay:     document.getElementById('delay-slider').value,
@@ -10973,9 +11218,10 @@ function loadSettings() {
     if (s.sens) { document.getElementById('sens-slider').value = s.sens; document.getElementById('sens-val').textContent = s.sens; updateSensitivity(); }
     if (s.delay) { document.getElementById('delay-slider').value = s.delay; document.getElementById('delay-val').textContent = (s.delay/10).toFixed(1)+'s'; updateDelay(); }
     if (s.chime !== undefined) document.getElementById('chime-toggle').checked = s.chime;
-    if (s.conf) { var cv=parseInt(s.conf); CONF_THRESHOLD=cv/100;
+    if (s.conf && isFinite(parseInt(s.conf))) { var cv=Math.max(10, Math.min(80, parseInt(s.conf))); CONF_THRESHOLD=cv/100;
       var b=document.getElementById('conf-slider-sticky'), bv=document.getElementById('conf-val-sticky');
-      if(b)b.value=cv; if(bv)bv.textContent=cv+'%'; }
+      if(b)b.value=cv; if(bv)bv.textContent=cv+'%';
+      var cc=document.getElementById('conf-chip-val'); if(cc)cc.textContent=cv+'%'; }
     if (s.english !== undefined) {
       document.getElementById('english-toggle').checked = s.english;
     }
@@ -10983,11 +11229,16 @@ function loadSettings() {
     if (s.personCheck !== undefined) { var _pc = document.getElementById('personcheck-toggle'); if (_pc) _pc.checked = s.personCheck; }
     if (s.diamonds !== undefined) { var _dm = document.getElementById('aim-diamonds'); if (_dm) _dm.checked = s.diamonds; }
     if (typeof s.twoPlayer === 'boolean') twoPlayer = s.twoPlayer;
+    if (s.sbGame && SB_GAMES[s.sbGame]) sbGame = s.sbGame;
+    if (s.sbRace && typeof s.sbRace === 'object') Object.keys(s.sbRace).forEach(function (k) {
+      if (SB_GAMES[k] && typeof s.sbRace[k] === 'number' && s.sbRace[k] > 0)
+        sbRace[k] = Math.round(Math.min(k === 'straight' ? 500 : 99, s.sbRace[k])); });
     if (typeof s.activePlayer === 'number') activePlayer = s.activePlayer ? 1 : 0;
     if (Array.isArray(s.players) && s.players.length === 2) {
       for (var pi=0; pi<2; pi++) {
         var src=s.players[pi]||{};
-        players[pi].name  = typeof src.name==='string' ? src.name : players[pi].name;
+        /* same 14-character limit the rename box enforces */
+        players[pi].name  = typeof src.name==='string' ? src.name.slice(0, 14) : players[pi].name;
         players[pi].score = typeof src.score==='number' ? src.score : 0;
         players[pi].fouls = typeof src.fouls==='number' ? src.fouls : 0;
         players[pi].racks = typeof src.racks==='number' ? src.racks : 0;
@@ -11002,15 +11253,15 @@ function loadSettings() {
       TABLE_SIZE = s.tableSize;
       document.querySelectorAll('#tablesize-row .pill').forEach(function(p){ p.classList.toggle('active', p.textContent.indexOf(s.tableSize + '-ft') === 0); });
     }
-    if (s.gameMode) {
+    if (s.gameMode && ['8ball', '9ball', 'straight'].indexOf(s.gameMode) !== -1) {
       gameMode = s.gameMode;
       _modeChosen = true;
       var _nr = document.getElementById('nineball-target-row');
       if (_nr) _nr.style.display = (gameMode === '9ball') ? 'block' : 'none';
       document.querySelectorAll('.pill[onclick*="setGame"]').forEach(p => p.classList.toggle('active', p.textContent.toLowerCase().replace('-','').includes(s.gameMode.replace('ball',''))));
     }
-    if (s.viewMode) { viewMode = s.viewMode; setViewMode(s.viewMode); }
-    if (s.spin) { currentEnglish = s.spin; }
+    if (s.viewMode === 'overhead' || s.viewMode === 'player') { viewMode = s.viewMode; setViewMode(s.viewMode); }
+    if (typeof s.spin === 'string' && typeof ENGLISH_DATA !== 'undefined' && (ENGLISH_DATA[s.spin] || s.spin === 'stun')) { currentEnglish = s.spin; }
     if (s.aimTarget  !== undefined) document.getElementById('aim-targetline').checked   = s.aimTarget;
     if (s.aimContact !== undefined) document.getElementById('aim-contactpoint').checked = s.aimContact;
     if (s.lsFlip) document.body.classList.add('ls-flip');
@@ -11716,7 +11967,10 @@ function showTourStep(){
      which would park the spotlight in the top-left corner over nothing.
      offsetParent is null for anything display:none, so this one check covers
      both the missing and the hidden case. */
-  if(!el || el.offsetParent === null){ tourNext(); return; }
+  /* getClientRects, not offsetParent: offsetParent is ALSO null for any
+     position:fixed element, so the last step - the fixed bottom bar - was
+     always skipped as if it were hidden. */
+  if(!el || !el.getClientRects().length){ tourNext(); return; }
   try{ el.scrollIntoView({behavior:'smooth', block:'center'}); }catch(_){}
   setTimeout(function(){
     var r=el.getBoundingClientRect();
@@ -11732,7 +11986,7 @@ function showTourStep(){
     var vis=[], curDot=0;
     TOUR_STEPS.forEach(function(stp,i){
       var e=document.querySelector(stp.sel);
-      if(e && e.offsetParent !== null){ if(i===_tourIdx) curDot=vis.length; vis.push(i); }
+      if(e && e.getClientRects().length){ if(i===_tourIdx) curDot=vis.length; vis.push(i); }
     });
     var dots=document.getElementById('tour-dots'); dots.innerHTML='';
     vis.forEach(function(_,i){ var d=document.createElement('div'); d.className='tour-dot'+(i===curDot?' on':''); dots.appendChild(d); });
@@ -12021,6 +12275,11 @@ try {
           &ldquo;<em>Take the <strong>solid</strong> to the <strong>corner pocket</strong>. <strong>This one is easy.</strong></em>&rdquo;<br>
           The ball is <em>solid</em>, <em>stripe</em> or <em>eight ball</em>. The pocket is <em>corner pocket</em> or <em>side pocket</em>. The last part is one of four, depending on the difficulty score: <em>This one is easy</em> (1&ndash;3), <em>Moderate shot</em> (4&ndash;5), <em>Tough shot</em> (6&ndash;8), or <em>Very low percentage. A safety may be smarter</em> (9&ndash;10). If the path is blocked it says so instead: &ldquo;<em>The stripe is blocked. Check the kick or combo option.</em>&rdquo;<br>
           <strong>It only talks &mdash; it doesn&rsquo;t listen.</strong> There are no voice commands and the microphone is never used. On an older iPhone, or an Android without Google Text-to-Speech installed, there may be no voice available &mdash; everything else still works.</div></div>
+        </div>
+
+        <div class="help-item">
+          <div class="help-icon">&#127942;</div>
+          <div><div class="help-item-title">Big Scoreboard &mdash; keeping score and winning</div><div class="help-item-desc">From the main menu, tap <strong>Big Scoreboard</strong>. Tap the game line at the top to pick the game &mdash; <strong>8-Ball, 9-Ball, 10-Ball, Straight Pool, One-Pocket or Bank Pool</strong> &mdash; and how far the match goes. Rack games are a <strong>race</strong>: tap <strong>+1</strong> for whoever wins each rack, first to the number wins (8-Ball starts at 5, 9- and 10-Ball at 7). Ball-count games add up as you go: <strong>+1 BALL</strong> for each ball made, <strong>&minus;1 FOUL</strong> when a foul costs one, for whoever is at the table &mdash; straight pool to 100 with the three-foul penalty applied for you, one-pocket and bank pool to 8. When someone gets there the board says so. <strong>&#8617; UNDO</strong> takes back the last tap, and <strong>New match</strong> clears the scores but keeps the names. The scoreboard&rsquo;s game is its own: picking 10-Ball here does not change how Scan &amp; Read reads shots.</div></div>
         </div>
 
         <div class="help-item">
@@ -12444,8 +12703,8 @@ try {
 <div id="scoreboard">
   <div id="sb-head">
     <div id="sb-title">SCOREBOARD</div>
-    <div id="sb-context">&nbsp;</div>
-    <div id="sb-hint">&#9998; Tap a player name to rename &middot; use the buttons at the bottom to score</div>
+    <button id="sb-context" onclick="openSbSetup()" aria-label="Change the game or start a new match">&nbsp;</button>
+    <div id="sb-hint">&#9998; Tap a name to rename &middot; tap the game to change it or start a new match</div>
   </div>
   <div id="sb-turn">
     <span style="color:var(--green-soft);font-size:clamp(16px,5vw,22px)">&#9654;</span>
@@ -12457,7 +12716,8 @@ try {
        it stays a column and nothing about the look changes. -->
   <div id="sb-controls">
     <div style="display:flex;gap:8px;margin-top:10px;flex-shrink:0">
-      <button id="sb-pass" onclick="passTurn()">PASS TURN</button>
+      <button id="sb-pass" onclick="sbSnap();passTurn()">PASS TURN</button>
+      <button id="sb-undo" onclick="sbUndo()" aria-label="Undo the last tap">&#8617; UNDO</button>
     </div>
     <div id="sb-taps"></div>
     <button id="sb-exit" onclick="exitScoreboard()">&#10005;&nbsp; EXIT SCOREBOARD</button>
