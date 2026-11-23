@@ -1181,6 +1181,25 @@ input[type=range]::-moz-range-thumb {
   .sb-games{ grid-template-columns:1fr 1fr 1fr; }
 }
 
+/* ── SCAN PAGE: only what is useful right now ─────────────────────── */
+.sug-game{ display:inline-flex; align-items:center; gap:6px; min-height:44px; margin:2px 0 8px; padding:0 14px;
+  background:#0b1811; border:1px solid var(--gold-dim); border-radius:22px; cursor:pointer;
+  font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:15px; letter-spacing:.4px; color:var(--gold-lt); }
+.sug-game span{ color:var(--text-muted); font-weight:600; }
+#unfold-btn{ display:none; width:100%; min-height:48px; margin:8px 0 0; align-items:center; justify-content:center;
+  background:#0d2430; color:#9fe4ff; border:1px solid #2c4a63; font-size:14px; font-weight:600; }
+body.read-folded #unfold-btn{ display:flex; }
+body.read-folded #step2-header, body.read-folded #align-controls,
+body.read-folded #step3-header, body.read-folded #step3-anchor,
+body.read-folded #step4-anchor, body.read-folded #step4-card { display:none !important; }
+body.no-photo #canvas-toolbar { display:none !important; }
+body:not(.cam-on) #scan-btn { display:none !important; }
+body.no-photo.scan-simple #step2-header, body.no-photo.scan-simple #align-controls,
+body.no-photo.scan-simple #step3-header, body.no-photo.scan-simple #step3-anchor,
+body.no-photo.scan-simple #step4-anchor, body.no-photo.scan-simple #step4-card { display:none !important; }
+/* Advanced Tuning is tuning: in Simple it only took room. Advanced shows it. */
+body.scan-simple #adv-tune-card { display:none !important; }
+
 #sb-hint{ text-align:center; font-family:'Barlow Condensed',sans-serif; letter-spacing:.5px;
   font-size: clamp(11px,3.1vw,13px); color:var(--gold-lt); opacity:.92; margin-top:7px; flex-shrink:0;
   background:rgba(200,151,46,.10); border:1px solid rgba(200,151,46,.28); border-radius:8px;
@@ -1896,8 +1915,14 @@ body.table-mode.tm-read #tm-advice { font-size: clamp(15px, 4.6vw, 22px); line-h
    as a grid so the buttons can never wrap off the bottom of a short phone. */
 body.table-mode.tm-read #tm-side { display: grid; grid-template-columns: auto 1fr; align-items: center;
   column-gap: 14px; row-gap: 10px; text-align: left; }
-body.table-mode.tm-read #tm-view { grid-column: 1; justify-self: start; }
-body.table-mode.tm-read #tm-exit { grid-column: 2; justify-self: start; }
+/* View, game and exit share one row under the read. */
+body.table-mode.tm-read #tm-btns { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; }
+#tm-game { display: none; margin-top: 6px; min-height: 44px; padding: 5px 12px; cursor: pointer; white-space: nowrap;
+  background: #0b1811; color: var(--gold-lt); border: 1px solid var(--gold-dim); border-radius: 8px;
+  font-family: 'Barlow Condensed', sans-serif; font-weight: 700; letter-spacing: .4px; font-size: clamp(12px, 3.3vw, 15px);
+  align-items: center; justify-content: center; }
+body.table-mode #tm-game { display: inline-flex; }
+body.table-mode.tm-read #tm-game { margin-top: 0; min-height: 48px; font-size: clamp(13px, 3.6vw, 16px); }
 body.table-mode.tm-read #tm-mute { grid-column: 1 / -1; }
 body.table-mode.tm-read #tm-key:empty + #tm-rate { grid-column: 1 / -1; }
 body.table-mode.tm-read #tm-key { display: block; flex: 0 0 auto; text-align: center; line-height: 0; }
@@ -2354,7 +2379,7 @@ body.hist-mode #history-panel {
       <div class="hdr-emblem">🎱</div>
       <div style="flex:1">
         <div class="hdr-name"><span>Curran&rsquo;s Shot Reader</span></div>
-        <div class="hdr-sub">See the table. Read the shot. <span style="color:var(--gold-dim);opacity:.7">· V11.23.0154</span></div>
+        <div class="hdr-sub">See the table. Read the shot. <span style="color:var(--gold-dim);opacity:.7">· V11.23.0221</span></div>
       </div>
       <div style="flex:1 1 100%;display:flex;gap:6px;justify-content:flex-end;margin-top:7px">
         <button class="help-btn" id="hdr-tour-btn" onclick="showWelcome()" title="Welcome tour"><span style="font-size:14px">👋</span> Tour</button>
@@ -2424,7 +2449,7 @@ body.hist-mode #history-panel {
     <div id="gamemode-card" class="card">
       <div class="card-label">Game Mode</div>
       <div class="pills">
-        <div class="pill" onclick="setGame('8ball',this)">8-Ball</div>
+        <div class="pill active" onclick="setGame('8ball',this)">8-Ball</div>
         <div class="pill"        onclick="setGame('9ball',this)">9-Ball</div>
         <div class="pill"        onclick="setGame('straight',this)">Straight</div>
       </div>
@@ -2692,8 +2717,11 @@ body.hist-mode #history-panel {
           <div id="tm-conf">–</div>
           <div id="tm-conf-lbl">DIFFICULTY</div>
         </div>
-        <button id="tm-view" onclick="tableModeToggleView()" style="display:none">&#128247; LIVE VIEW</button>
-        <button id="tm-exit" onclick="exitTableMode()">✕ EXIT</button>
+        <div id="tm-btns">
+          <button id="tm-view" onclick="tableModeToggleView()" style="display:none">&#128247; LIVE VIEW</button>
+          <button id="tm-game" onclick="openGamePicker()" aria-label="Change the game">&#127921; 8-BALL</button>
+          <button id="tm-exit" onclick="exitTableMode()">✕ EXIT</button>
+        </div>
         <div id="tm-mute" onclick="tableModeUnmute()" role="button" tabindex="0" style="display:none">🔇 MUTED — TAP</div>
       </div>
     </div>
@@ -2829,6 +2857,7 @@ body.hist-mode #history-panel {
       <div class="suggestion" id="suggestion">
         <div class="geo-badges" id="geo-badges"></div>
         <div class="sug-title"  id="sug-title"></div>
+        <button type="button" id="sug-game" class="sug-game" onclick="openGamePicker()" style="display:none"></button>
         <div class="contact-key" id="contact-key" style="display:none;float:right;margin:0 0 8px 12px;text-align:center"></div>
         <div id="contact-key-note" style="display:none;font-size:11.5px;color:var(--text-muted);font-style:italic;margin:0 0 8px;line-height:1.45"></div>
         <!-- The verdict is always on screen; the full read sits behind one tap. -->
@@ -2837,6 +2866,7 @@ body.hist-mode #history-panel {
         <div class="sug-body"   id="sug-body"></div>
         <div class="coaching-box" id="coaching-box"></div>
       </div>
+      <button type="button" class="btn" id="unfold-btn" onclick="unfoldSteps()">&#9881; Change something &mdash; the table, the balls or the game</button>
     </div><!-- /table-stage -->
 
 
@@ -3835,7 +3865,26 @@ function toggleTips(id) {
   try { localStorage.setItem('curran_tips_open', w.classList.contains('open') ? '1' : '0'); } catch(_) {}
 }
 
+/* What the Scan page shows depends on where the player is:
+   - no photo yet: the camera, the upload and the sample shot; nothing to
+     align, fix or undo yet, so those steps and the photo toolbar wait
+   - a photo: the steps appear, in order
+   - an answer (Simple): the steps fold away under it behind one button
+   Advanced keeps every step on screen; it is for people who want the controls. */
+var _stepsOpen = false;
+function syncScanChrome() {
+  var b = document.body; if (!b) return;
+  b.classList.toggle('no-photo', !sourceImg);
+  b.classList.toggle('cam-on', typeof cameraOn !== 'undefined' && !!cameraOn);
+  b.classList.toggle('scan-simple', !!simpleMode);
+  if (!sourceImg || !simpleMode || _stepsOpen || !window._shotRead) b.classList.remove('read-folded');
+}
+function unfoldSteps() {
+  _stepsOpen = true; document.body.classList.remove('read-folded');
+  var h = document.getElementById('step2-header'); if (h) try { h.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
+}
 function updateScanSteps() {
+ try { syncScanChrome(); } catch (_) {}
  try {
   var bar = document.getElementById('scan-steps');
   if (!bar) return;
@@ -4764,7 +4813,10 @@ async function captureFrame(mode) {
     playChime('scan');
     const label = mode === 'auto' ? '⚡ Frame captured' : '📸 Frame captured';
     setStatus(label + (modelReady ? ' — running AI detection…' : ' — mark balls manually'), 'gold');
-    if (modelReady && autoScan) setTimeout(() => runDetection(), 300);
+    _stepsOpen = false;
+    /* SCAN NOW used to stop at the photo whenever auto-scan was off. A capture
+       is always followed by the read, whichever way it was taken. */
+    if (modelReady) setTimeout(() => runDetection(), 300);
   };
   img.src = tmp.toDataURL('image/jpeg', 0.92);
 }
@@ -4805,8 +4857,18 @@ function loadImageFile(file) {
       document.getElementById('english-panel').style.display = '';
     }
     setTimeout(() => document.getElementById('canvas-card').scrollIntoView({behavior:'smooth', block:'start'}), 120);
-    setStatus('Photo loaded' + (modelReady ? ' — tap AI Detect' : ' — mark balls manually'), 'gold');
     URL.revokeObjectURL(url);
+    _stepsOpen = false;
+    /* One step from photo to answer, the same pipeline a camera capture runs:
+       find the table, find the balls, read the shot. It only stops to ask when
+       it genuinely cannot tell - which pocket, on a close-up. */
+    if (modelReady) {
+      setStatus('Photo loaded \u2014 finding the table and the balls\u2026', 'gold');
+      setTimeout(function () { try { autoAlignTable(); } catch (_) {} }, 80);
+      setTimeout(function () { try { runDetection(); } catch (_) {} }, 300);
+    } else {
+      setStatus('Photo loaded \u2014 the AI is still loading, so tap the balls to mark them', 'gold');
+    }
   };
   img.onerror = () => { setStatus('Could not load image', 'err'); URL.revokeObjectURL(url); };
   img.src = url;
@@ -8906,6 +8968,8 @@ function suggestShot() {
   var _vd = document.getElementById('sug-verdict'), _mb = document.getElementById('sug-more');
   if (_vd) { _vd.textContent = ''; _vd.style.display = 'none'; }
   if (_mb) _mb.style.display = 'none';
+  var _gc = document.getElementById('sug-game'); if (_gc) _gc.style.display = 'none';
+  titl.style.display = '';
   body.classList.remove('collapsed');
   var _ck = document.getElementById('contact-key'); if (_ck) _ck.style.display='none';
   var _ckn0 = document.getElementById('contact-key-note'); if (_ckn0) _ckn0.style.display='none';
@@ -9370,6 +9434,11 @@ function suggestShot() {
   if (!_keepFocus) _focusRank = 0;
   updateShotSelector();
   window._shotRead = true;          // presentation flag for the progress ribbon only
+  var _gc2 = document.getElementById('sug-game');
+  if (_gc2) { _gc2.innerHTML = '&#127921; ' + gameWord(gameMode) + ' <span>\u00b7 change</span>'; _gc2.style.display = 'inline-flex'; titl.style.display = 'none'; }
+  /* The answer is what they came for: fold the setup steps away under it.
+     "Change something" brings them back, and stays open until a new photo. */
+  if (simpleMode && !_stepsOpen) document.body.classList.add('read-folded');
   sug.classList.add('show');
   // Don't yank the page around when the arrows regenerate the panel.
   if (!_keepFocus) setTimeout(function(){ sug.scrollIntoView({behavior:'smooth', block:'nearest'}); }, 60);
@@ -9899,7 +9968,12 @@ function setMode(mode) {
   document.querySelectorAll('.mark-chip').forEach(c=>c.classList.toggle('active',c.dataset.mode===mode));
 }
 
-var _modeChosen = false;      // must pick a game before AI Detect / Suggest
+/* The game used to be a gate: nothing - not AI Detect, not a read, not Table
+   Mode - would run until a game was picked in Quick Setup. MEASURED with a
+   first-time player: an uploaded photo took 8 taps and still gave no answer,
+   and Table Mode sat on "Looking for a shot" for ever. It now starts on 8-Ball,
+   the game most people play, and the game button on every answer changes it. */
+var _modeChosen = true;
 /* Align tip: shown at most once per photo. Reset when a new frame arrives,
    and permanently silenced the moment a table IS aligned - having aligned
    once, the player has learned the thing the tip exists to teach. */
@@ -10932,7 +11006,7 @@ function startSampleShot() {
     sourceImg = img; marks = []; aligning = false;
     window._tableH = null; window._tHf = null; window._tHinv = null; window._tCanonLong = null; window._tLongFlip = false;
     _pickingLowest = false; window._pendingPocketRemove = null;
-    _sampleMode = true;
+    _sampleMode = true; _stepsOpen = false;
     viewMode = 'overhead'; if (typeof syncViewPills === 'function') syncViewPills();
     // Auto-pick 8-Ball so the mode gate never blocks the demo
     if (!_modeChosen) {
@@ -10981,6 +11055,33 @@ function startSampleShot() {
 function toggleRules() {
   var o = document.getElementById('rules-overlay');
   if (o) o.style.display = (o.style.display === 'flex') ? 'none' : 'flex';
+}
+/* One sheet for changing the game, opened from the answer and from Table
+   Mode. Re-reads the table straight away, so the answer always matches it. */
+function gameWord(m) { return m === '9ball' ? '9-Ball' : m === 'straight' ? 'Straight Pool' : '8-Ball'; }
+function openGamePicker() {
+  var old = document.getElementById('game-sheet'); if (old) old.remove();
+  var w = document.createElement('div'); w.id = 'game-sheet'; w.className = 'sb-rn';
+  w.innerHTML = '<div class="sb-rn-card" role="dialog" aria-label="Pick your game"><h4>&#127921; Which game?</h4>' +
+    '<div class="sb-games" style="grid-template-columns:1fr">' +
+    ['8ball', '9ball', 'straight'].map(function (m) {
+      return '<button type="button" class="' + (m === gameMode ? 'on' : '') + '" onclick="pickGame(\'' + m + '\')">' + gameWord(m).toUpperCase() + '</button>';
+    }).join('') + '</div>' +
+    '<div class="sb-note">The rules change which ball is the right one to shoot. Your choice is remembered.</div>' +
+    '<div class="sb-rn-btns"><button type="button" onclick="closeGamePicker()" style="background:#1a2a1f;color:#cdddd0;border:1px solid var(--border)">CLOSE</button></div></div>';
+  w.onclick = function (e) { if (e.target === w) w.remove(); };
+  document.body.appendChild(w);
+}
+function closeGamePicker() { var w = document.getElementById('game-sheet'); if (w) w.remove(); }
+function pickGame(m) {
+  closeGamePicker();
+  quickSetGame(m);
+  syncTableGameBtn();
+  if (sourceImg && marks.some(function (x) { return x.type === 'cue'; })) suggestShot();
+  setStatus('Playing ' + gameWord(m), 'gold');
+}
+function syncTableGameBtn() {
+  var b = document.getElementById('tm-game'); if (b) b.innerHTML = '&#127921; ' + gameWord(gameMode).toUpperCase();
 }
 function quickSetGame(mode) {
   // Find the main game pill by its onclick and route through setGame, so the
@@ -11104,6 +11205,7 @@ function setSimpleView(simple) {
   var t = document.getElementById('simplemode-toggle');
   if (t) t.checked = simple;
   toggleSimpleMode();
+  try { syncScanChrome(); } catch (_) {}
 }
 // Collapsible manual-marking chips (collapsed by default — AI + tap-to-fix is the main path).
 // Keep the two AI Confidence sliders (above canvas + sticky bar) in lockstep.
@@ -11799,6 +11901,7 @@ function enterTableMode() {
   var t = document.getElementById('autoscan-toggle');
   if (t) t.checked = true;
 
+  syncTableGameBtn();
   unlockSpeech();          // MUST be inside the tap gesture, or iOS stays mute
   acquireWakeLock();       // keep the screen up while it sits on the tripod
   resetSpokenShot();       // first suggestion should always be spoken
@@ -11933,7 +12036,11 @@ function updateTableBanner() {
      The pocket, named from where the phone stands, says which ball. */
   elT.textContent = top.blocked ? (ball + ' \u2014\nblocked') : (ball + ' \u2192\n' + where);
   _tmFitTitle();
-  elA.textContent = top.blocked
+  /* 9-Ball: the legal ball is the LOWEST number, which the AI does not read.
+     Without the lowest ball set this is only the easiest ball - say so,
+     rather than "good shot" on a ball the rules may not allow. */
+  var _nine = (gameMode === '9ball' && !marks.some(function (m) { return m._mustHit; }));
+  elA.textContent = _nine ? 'Only if it is the lowest ball on the table \u2014 9-Ball rules.' : top.blocked
     ? 'No clear path. Check the kick or combo option.'
     : (d <= 3 ? 'Good shot. Step in with confidence.'
      : d <= 5 ? 'Moderate. Take your time.'
@@ -12080,6 +12187,8 @@ function buildSpokenSummary() {
     /* The pocket does the identifying: only one ball of that kind is usually
        lined up for the far left corner, so the player can find it without
        looking at the screen - which is the point of hearing it. */
+    if (gameMode === '9ball' && !marks.some(function (m) { return m._mustHit; }))
+      how = 'Only if it is the lowest ball.';
     return capitalize(ball) + ' into the ' + where + '. ' + how;
   } catch (e) { return ''; }
 }
@@ -12297,7 +12406,7 @@ var TOUR_STEPS = [
   { sel:'#mini-view', n:'Simple vs Advanced', d:'Right in the top bar, on every screen. SIMPLE keeps it to the essentials: the crown, the ghost ball and the line. ADV adds the diamond system, spin, aiming aids and tuning.' },
   { sel:'#view-mode-card', n:'Perspective Mode', d:'Tell it how you\u2019re holding the phone: Player View for a normal standing angle, Overhead if it is above the table. This decides how cut angles and diamond numbers are worked out, so set it before you start marking balls. Advanced only \u2014 skipped in Simple.' },
   { sel:'#quick-setup', n:'Quick Setup — set once', d:'Game mode and table size live here. It stays folded away so the camera is the first thing you see — tap the header to open it, and the closed row still shows what is set. Advanced Tuning sits in its own card just below.' },
-  { sel:'#step1-anchor', n:'1 · Take a picture', d:'Start here. The camera never switches itself on — tap Start Camera when you are ready, or upload a photo you already have. Overhead shots work best.' },
+  { sel:'#step1-anchor', n:'1 · Take a picture', d:'Start here. The camera never switches itself on — tap Start Camera when you are ready, or upload a photo you already have. From there it finds the table, finds the balls and reads the shot by itself. Overhead shots work best.' },
   { sel:'#auto-align-btn', n:'2 · Line up the table', d:'Tap ✨ AUTO and the app finds the table for you — that is the normal path. Only use “📐 Align Table by hand” underneath if Auto cannot see the corners.' },
   { sel:'#step3-anchor', n:'3 · Check the balls', d:'The AI finds the balls automatically. If one is labeled wrong, just tap it until it\u2019s right.' },
   { sel:'#step4-anchor', n:'4 · Game & shot', d:'The checklist before you tap Suggest Best Shot: cue ball marked, at least one object ball, and a pocket.' },
@@ -12594,19 +12703,19 @@ try {
         <div class="help-sec-body">
         <div class="help-item">
           <div class="help-icon">1️⃣</div>
-          <div><div class="help-item-title">Take a picture of your table</div><div class="help-item-desc">Tap <strong>Start Camera</strong> and point at the table, or tap <strong>📁 Upload Photo</strong> to pick one from your phone.</div></div>
+          <div><div class="help-item-title">Take a picture of your table</div><div class="help-item-desc">Tap <strong>Start Camera</strong> and point at the table, or tap <strong>📁 Upload Photo</strong> to pick one from your phone. From there it works on its own: it <strong>finds the table, finds the balls and reads the shot</strong>.</div></div>
         </div>
         <div class="help-item">
           <div class="help-icon">2️⃣</div>
-          <div><div class="help-item-title">Line up the table</div><div class="help-item-desc"><strong>Try ✨ Auto first</strong> — it finds the table on its own and is the normal path. If it can&rsquo;t, tap <strong>📐 Align Table by hand</strong>, then tap the table&rsquo;s 4 corners. Every pocket gets placed for you automatically.</div></div>
+          <div><div class="help-item-title">If it asks, answer it</div><div class="help-item-desc">On a close-up, or a photo where part of the table is out of shot, it asks you to <strong>tap the pocket you&rsquo;re aiming at</strong>. Want sharper angles? Tap <strong>Change something</strong> under the answer, then <strong>📐 Align Table by hand</strong> and tap the table&rsquo;s 4 corners.</div></div>
         </div>
         <div class="help-item">
           <div class="help-icon">3️⃣</div>
-          <div><div class="help-item-title">Pick your game, then AI Detect</div><div class="help-item-desc">Choose <strong>8-Ball, 9-Ball, or Straight</strong> in Quick Setup (the rules change which ball you should shoot), then tap <strong>🤖 AI Detect</strong> in the bottom bar. The AI finds and marks the balls — tap any it gets wrong to fix it.</div></div>
+          <div><div class="help-item-title">Playing something other than 8-Ball?</div><div class="help-item-desc">It starts on <strong>8-Ball</strong>. Tap the <strong>🎱 game button</strong> on the answer for 9-Ball or Straight &mdash; it reads the shot again straight away, and remembers your choice.</div></div>
         </div>
         <div class="help-item">
           <div class="help-icon">4️⃣</div>
-          <div><div class="help-item-title">Tap Suggest Best Shot</div><div class="help-item-desc">It&rsquo;s in the bar at the bottom of your screen. The app reads the shot, rates how hard it is, and coaches you through it.</div></div>
+          <div><div class="help-item-title">Fix a ball, read it again</div><div class="help-item-desc">If the AI marks a ball wrong, tap it to change it, then tap <strong>🔍 Suggest Best Shot</strong> in the bottom bar to read the shot again.</div></div>
         </div>
           <div class="help-tip">💡 <strong>That&rsquo;s it!</strong> Everything below explains each feature in more detail.
         </div>
@@ -12642,7 +12751,7 @@ try {
         </div>
         <div class="help-item">
           <div class="help-icon">&#9654;&#65039;</div>
-          <div><div class="help-item-title">Table Mode &mdash; hands-free on a tripod</div><div class="help-item-desc">From the main menu, tap <strong>Table Mode</strong>. The setup controls disappear and you get just the camera. As soon as it has a shot, the screen fills with <strong>the big read</strong>: a picture of your table with the shot drawn on it, which ball, which pocket, where to strike it, and how hard it is out of 10 &mdash; in type you can read from where you shoot. It reads the table by itself every time the balls move and settle &mdash; <strong>you never touch the phone between shots</strong>. <strong>Tap the picture</strong> any time to make it read again straight away, or <strong>&#128247; LIVE VIEW</strong> to see the camera while you aim the phone. <strong>&#10005; EXIT</strong> puts everything back exactly as it was.</div></div>
+          <div><div class="help-item-title">Table Mode &mdash; hands-free on a tripod</div><div class="help-item-desc">From the main menu, tap <strong>Table Mode</strong>. The setup controls disappear and you get just the camera. Tap <strong>&#127921; 8-BALL</strong> on that screen to change the game. As soon as it has a shot, the screen fills with <strong>the big read</strong>: a picture of your table with the shot drawn on it, which ball, which pocket, where to strike it, and how hard it is out of 10 &mdash; in type you can read from where you shoot. It reads the table by itself every time the balls move and settle &mdash; <strong>you never touch the phone between shots</strong>. <strong>Tap the picture</strong> any time to make it read again straight away, or <strong>&#128247; LIVE VIEW</strong> to see the camera while you aim the phone. <strong>&#10005; EXIT</strong> puts everything back exactly as it was.</div></div>
         </div>
 
         <div class="help-item">
@@ -12926,7 +13035,7 @@ try {
         <div class="help-sec-body">
         <div class="help-item">
           <div class="help-icon">🔘</div>
-          <div><div class="help-item-title">Turn it on</div><div class="help-item-desc">Switch on English / Spin Control in Advanced Tuning. A cue ball diagram pops up so you can choose where you&rsquo;ll strike the ball.</div></div>
+          <div><div class="help-item-title">Turn it on</div><div class="help-item-desc">Switch to <strong>ADV</strong> at the top, then switch on English / Spin Control in Advanced Tuning. A cue ball diagram pops up so you can choose where you&rsquo;ll strike the ball.</div></div>
         </div>
         <div class="help-item">
           <div class="help-icon">🌀</div>
@@ -12982,7 +13091,7 @@ try {
           <div class="help-icon">⇆</div>
           <div><div class="help-item-title">Landscape — swap sides</div><div class="help-item-desc">Turn the phone sideways and the table pins to one side with the advice beside it. The round <strong>⇆ button on the divider</strong> swaps which side the table sits on — handy for left-handers or whichever way you hold the phone. Your choice is remembered.</div></div>
         </div>
-          <div class="help-tip">💡 Turn these on or off any time in Advanced Tuning. Start with Target Line and Contact Point — they&rsquo;re the easiest to read.
+          <div class="help-tip">💡 Turn these on or off any time in Advanced Tuning (switch to <strong>ADV</strong> at the top to see it). Start with Target Line and Contact Point — they&rsquo;re the easiest to read.
         </div>
         </div>
       
