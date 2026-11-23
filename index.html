@@ -1270,8 +1270,22 @@ input[type=range]::-moz-range-thumb {
 .dl-modal.zoomed .dl-eq{ margin-top:8px; }
 .dl-modal.zoomed .dl-eq-actions{ margin-top:7px; }
 
-.dl-modes{ display:flex; gap:6px; margin:11px 0 2px; }
-.dl-modes button{ flex:1; min-height:44px; border-radius:10px; cursor:pointer;
+.dl-modes{ display:flex; gap:6px; margin:11px 0 2px; flex-wrap:wrap; }
+/* four modes: two rows of two on a narrow phone, one row when there is room */
+.dl-modes button{ flex:1 1 40%; }
+@media (min-width: 560px){ .dl-modes button{ flex:1 1 0; } }
+.dl-routes, .dl-practice{ display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 0; }
+.dl-routes:empty, .dl-practice:empty{ display:none; }
+.dl-routes-h, .dl-practice-h{ flex:1 1 100%; font-family:'Barlow Condensed',sans-serif; font-weight:700;
+  font-size:12px; letter-spacing:1px; color:var(--text-muted); }
+.dl-routes button, .dl-practice button{ flex:1 1 44%; min-height:44px; border-radius:10px; cursor:pointer;
+  background:#0b1811; color:var(--cream); border:1px solid var(--border); padding:6px 8px;
+  font-family:'Barlow Condensed',sans-serif; font-size:14px; letter-spacing:.3px; }
+.dl-routes button b{ color:#ffd76a; }
+.dl-routes button.wide{ flex-basis:100%; }
+.dl-routes button.on, .dl-practice button.on{ background:rgba(200,151,46,.18); border-color:var(--gold); color:var(--gold-lt); }
+.dl-practice-note{ flex:1 1 100%; font-size:13px; color:var(--text-dim); line-height:1.45; }
+.dl-modes button{ flex:1 1 40%; white-space:nowrap; min-height:44px; border-radius:10px; cursor:pointer;
   background:#0b1811; border:1px solid var(--border); color:var(--text-muted);
   font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:12px;
   letter-spacing:.4px; padding:6px 4px; transition:background .18s ease, border-color .18s ease, color .18s ease; }
@@ -2340,7 +2354,7 @@ body.hist-mode #history-panel {
       <div class="hdr-emblem">🎱</div>
       <div style="flex:1">
         <div class="hdr-name"><span>Curran&rsquo;s Shot Reader</span></div>
-        <div class="hdr-sub">See the table. Read the shot. <span style="color:var(--gold-dim);opacity:.7">· V11.17.0137</span></div>
+        <div class="hdr-sub">See the table. Read the shot. <span style="color:var(--gold-dim);opacity:.7">· V11.23.0154</span></div>
       </div>
       <div style="flex:1 1 100%;display:flex;gap:6px;justify-content:flex-end;margin-top:7px">
         <button class="help-btn" id="hdr-tour-btn" onclick="showWelcome()" title="Welcome tour"><span style="font-size:14px">👋</span> Tour</button>
@@ -5968,7 +5982,16 @@ var DL_X0 = 60, DL_Y0 = 26, DL_W = 280, DL_H = 140;   // 280x140 = a true 2:1 ta
 var DL_X1 = DL_X0 + DL_W, DL_Y1 = DL_Y0 + DL_H;
 var DL_STEP = DL_W / 8;                                // 35 - equal on both axes
 var DL_SHORT = [0, 1, 2, 3, 4];   // four segments, counted from a corner
-var DL_R = 6.3;      // ball radius to scale: 2.25" ball on a 100" bed
+/* Two radii on purpose. DL_RR is the REAL ball: 1.125" on a 100" bed, and
+   every piece of geometry uses it - where the cue ball's centre turns at a
+   cushion, how much room it needs past another ball, the ghost-ball spot.
+   DL_R is only how big a ball is DRAWN; at true size a ball would be under
+   3 pixels across on a phone. It was 6.3 and used for the geometry too, so the
+   lesson treated every ball as twice its real width and called open routes
+   blocked. Drawn slightly under the clearance, so a path that is clear
+   visibly clears. */
+var DL_RR = DL_W * 1.125 / 100;   // 3.15 - real radius, for geometry
+var DL_R = 5;                     // drawn radius only
 var DL_POCKET = 9;   // how close to a pocket mouth counts as "no cushion there"
 
 var _dlCue = { x: DL_X0 + DL_STEP * 1.2, y: DL_Y1 - 26 };
@@ -6007,7 +6030,7 @@ function dlReset() {
   _dlCue = { x: DL_X0 + DL_STEP * 1.2, y: DL_Y1 - 26 };
   _dlObj = { x: DL_X0 + DL_STEP * 6.2, y: DL_Y0 + 30 };
   _dlObs = [];
-  _dlMode = 'cue';
+  _dlMode = 'cue'; _dlPocket = null; _dlRouteKey = null; _dlPractice = null;
   dlRender();
 }
 function dlClearBlockers() { _dlObs = []; dlRender(); }
@@ -6024,7 +6047,7 @@ function dlSegBlocked(a, b, skip) {
     var t = L2 ? (wx * vx + wy * vy) / L2 : 0;
     t = t < 0 ? 0 : (t > 1 ? 1 : t);
     var dx = a.x + t * vx - o.x, dy = a.y + t * vy - o.y;
-    if (Math.sqrt(dx * dx + dy * dy) < DL_R * 2) return true;   // ball-width gap needed
+    if (Math.sqrt(dx * dx + dy * dy) < DL_RR * 2) return true;  // two real radii: centre to centre
   }
   return false;
 }
@@ -6075,10 +6098,10 @@ function dlBankShots() {
       /* The object ball has to be driven along obj -> hit, so the cue ball
          must reach the ghost position behind it. */
       var dx = hit.x - _dlObj.x, dy = hit.y - _dlObj.y, L = Math.hypot(dx, dy);
-      if (L < DL_R) continue;
-      var gx = _dlObj.x - (dx / L) * 2 * DL_R, gy = _dlObj.y - (dy / L) * 2 * DL_R;
+      if (L < DL_RR) continue;
+      var gx = _dlObj.x - (dx / L) * 2 * DL_RR, gy = _dlObj.y - (dy / L) * 2 * DL_RR;
       var ax = gx - _dlCue.x, ay = gy - _dlCue.y, aL = Math.hypot(ax, ay);
-      if (aL < DL_R) continue;
+      if (aL < DL_RR) continue;
       var cosCut = (ax * dx + ay * dy) / (aL * L);
       if (cosCut < 0.17) continue;                   // past ~80 deg it is not a shot
       var cut = Math.round(Math.acos(Math.max(-1, Math.min(1, cosCut))) * 180 / Math.PI);
@@ -6231,11 +6254,19 @@ function dlCrossesPocket(a, b) {
    or cushion response beyond a perfect mirror, which the lesson text is
    explicit about. */
 
+/* A ball's CENTRE turns one radius before the cushion, not at the cushion
+   line, so the mirror sits there. Mirroring at the rail itself aimed every
+   kick slightly long - by up to a ball's width with the cue ball near the
+   rail. The diamond number is unchanged by this: the contact point on the
+   cushion is straight out from where the centre turns. */
+function dlRailLine(rail) {
+  return rail === 'top' ? DL_Y0 + DL_RR : rail === 'bottom' ? DL_Y1 - DL_RR
+       : rail === 'left' ? DL_X0 + DL_RR : DL_X1 - DL_RR;
+}
 function dlMirror(p, rail) {
-  if (rail === 'top')    return { x: p.x, y: 2 * DL_Y0 - p.y };
-  if (rail === 'bottom') return { x: p.x, y: 2 * DL_Y1 - p.y };
-  if (rail === 'left')   return { x: 2 * DL_X0 - p.x, y: p.y };
-  return { x: 2 * DL_X1 - p.x, y: p.y };
+  var v = dlRailLine(rail);
+  if (rail === 'top' || rail === 'bottom') return { x: p.x, y: 2 * v - p.y };
+  return { x: 2 * v - p.x, y: p.y };
 }
 
 /* Where does the segment a->b meet the given rail line? Null if it does not
@@ -6243,14 +6274,14 @@ function dlMirror(p, rail) {
 function dlRailHit(a, b, rail) {
   var t, hit;
   if (rail === 'top' || rail === 'bottom') {
-    var yr = (rail === 'top') ? DL_Y0 : DL_Y1;
+    var yr = dlRailLine(rail);
     if (Math.abs(b.y - a.y) < 1e-9) return null;
     t = (yr - a.y) / (b.y - a.y);
     if (t <= 1e-6 || t >= 1 - 1e-6) return null;
     hit = { x: a.x + t * (b.x - a.x), y: yr };
     if (hit.x < DL_X0 - 1e-6 || hit.x > DL_X1 + 1e-6) return null;
   } else {
-    var xr = (rail === 'left') ? DL_X0 : DL_X1;
+    var xr = dlRailLine(rail);
     if (Math.abs(b.x - a.x) < 1e-9) return null;
     t = (xr - a.x) / (b.x - a.x);
     if (t <= 1e-6 || t >= 1 - 1e-6) return null;
@@ -6261,13 +6292,28 @@ function dlRailHit(a, b, rail) {
 }
 
 /* A full route off the given sequence of rails, or null if impossible. */
-function dlKickPath(rails) {
+/* KICK TO POT. Aiming the kick at the object ball's centre gives a full hit -
+   right for a legal contact or a safety, but the ball then goes wherever that
+   sends it. To make it in a chosen pocket, aim at the GHOST-BALL spot: where
+   the cue ball's centre must be at contact, two radii back from the object
+   ball, straight away from the pocket. Same mirror, different target. */
+var _dlPocket = null;      // index into dlPockets(), or null for a plain hit
+var _dlRouteKey = null;    // the route the player picked, e.g. 'left' or 'top-right'
+function dlGhost() {
+  if (_dlPocket === null) return null;
+  var pk = dlPockets()[_dlPocket]; if (!pk) return null;
+  var dx = pk.x - _dlObj.x, dy = pk.y - _dlObj.y, L = Math.hypot(dx, dy);
+  if (L < 1e-6) return null;
+  return { x: _dlObj.x - dx / L * 2 * DL_RR, y: _dlObj.y - dy / L * 2 * DL_RR, ux: dx / L, uy: dy / L, pocket: pk };
+}
+function dlKickPath(rails, target) {
+  target = target || _dlObj;
   var n = rails.length, i;
   for (i = 1; i < n; i++) if (rails[i] === rails[i - 1]) return null;  // can't hit the same cushion twice running
 
   // images[i] = the target mirrored across rails i..n-1
   var images = new Array(n);
-  images[n - 1] = dlMirror(_dlObj, rails[n - 1]);
+  images[n - 1] = dlMirror(target, rails[n - 1]);
   for (i = n - 2; i >= 0; i--) images[i] = dlMirror(images[i + 1], rails[i]);
 
   var hits = [], from = _dlCue;
@@ -6279,7 +6325,7 @@ function dlKickPath(rails) {
   }
 
   // legs, in order, ending at the object ball
-  var pts = [_dlCue].concat(hits, [_dlObj]);
+  var pts = [_dlCue].concat(hits, [target]);
   var len = 0, blocked = false, scratch = null;
   for (i = 0; i < pts.length - 1; i++) {
     len += Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y);
@@ -6294,7 +6340,7 @@ function dlKickPath(rails) {
           : (rails[0] === 'left')   ? (_dlCue.x - DL_X0)
                                     : (DL_X1 - _dlCue.x);
   var leg1 = Math.hypot(hits[0].x - _dlCue.x, hits[0].y - _dlCue.y);
-  var tight = (gap < DL_R * 2) || (leg1 < DL_R * 2.4);
+  var tight = (gap < DL_RR * 2.5) || (leg1 < DL_RR * 3);
 
   // any contact point sitting in a pocket mouth rather than on cushion
   var pocket = false, nums = [];
@@ -6304,10 +6350,23 @@ function dlKickPath(rails) {
     if (info.pocket) pocket = true;
   }
 
+  /* Kicking to pot: the cue ball has to arrive at the ghost spot moving
+     toward the pocket side, or there is no cut that sends the ball in. Past
+     about 80 degrees it is not a shot. The object ball's own path to the
+     pocket must be clear as well. */
+  var cut = null, cutBad = false, objBlocked = false;
+  if (target !== _dlObj && target.ux !== undefined) {
+    var last = pts[pts.length - 2], ex = target.x - last.x, ey = target.y - last.y, eL = Math.hypot(ex, ey) || 1;
+    var cs = (ex * target.ux + ey * target.uy) / eL;
+    cut = Math.round(Math.acos(Math.max(-1, Math.min(1, cs))) * 180 / Math.PI);
+    cutBad = cs < 0.17;
+    objBlocked = dlSegBlocked(_dlObj, target.pocket);
+  }
   return { rails: rails.slice(), hits: hits, pts: pts, n: nums[0], nums: nums,
            cushions: n, pocket: pocket, blocked: blocked, scratch: scratch,
            tight: tight, gap: gap, leg1: leg1, len: len,
-           rail: rails[0], hit: hits[0] };
+           rail: rails[0], hit: hits[0], key: rails.join('-'),
+           cut: cut, cutBad: cutBad, objBlocked: objBlocked };
 }
 
 var DL_RAILS = ['top', 'bottom', 'left', 'right'];
@@ -6316,23 +6375,27 @@ var DL_RAILS = ['top', 'bottom', 'left', 'right'];
    is clean: a one-rail kick is easier to hit than a three-railer. */
 function dlAllKicks(maxCushions) {
   var max = maxCushions || 3, out = [], i, j, k;
+  var tg = dlGhost() || _dlObj;      // a chosen pocket means kick to the ghost spot
   for (i = 0; i < 4; i++) {
-    var a = dlKickPath([DL_RAILS[i]]);
+    var a = dlKickPath([DL_RAILS[i]], tg);
     if (a) out.push(a);
   }
   if (max >= 2) for (i = 0; i < 4; i++) for (j = 0; j < 4; j++) {
     if (i === j) continue;
-    var b = dlKickPath([DL_RAILS[i], DL_RAILS[j]]);
+    var b = dlKickPath([DL_RAILS[i], DL_RAILS[j]], tg);
     if (b) out.push(b);
   }
   if (max >= 3) for (i = 0; i < 4; i++) for (j = 0; j < 4; j++) for (k = 0; k < 4; k++) {
     if (i === j || j === k) continue;
-    var c = dlKickPath([DL_RAILS[i], DL_RAILS[j], DL_RAILS[k]]);
+    var c = dlKickPath([DL_RAILS[i], DL_RAILS[j], DL_RAILS[k]], tg);
     if (c) out.push(c);
   }
+  /* A pot that needs an impossible cut, or whose object ball is blocked on
+     the way to the pocket, is not a route at all. */
+  out = out.filter(function (r) { return !r.cutBad; });
   out.sort(function (p, q) {
-    var sp = (p.blocked ? 40 : 0) + (p.tight ? 20 : 0) + (p.scratch ? 10 : 0) + (p.pocket ? 5 : 0);
-    var sq = (q.blocked ? 40 : 0) + (q.tight ? 20 : 0) + (q.scratch ? 10 : 0) + (q.pocket ? 5 : 0);
+    var sp = (p.blocked ? 40 : 0) + (p.objBlocked ? 30 : 0) + (p.tight ? 20 : 0) + (p.scratch ? 10 : 0) + (p.pocket ? 5 : 0);
+    var sq = (q.blocked ? 40 : 0) + (q.objBlocked ? 30 : 0) + (q.tight ? 20 : 0) + (q.scratch ? 10 : 0) + (q.pocket ? 5 : 0);
     if (sp !== sq) return sp - sq;
     if (p.cushions !== q.cushions) return p.cushions - q.cushions;   // simplest route wins
     return p.len - q.len;
@@ -6340,6 +6403,65 @@ function dlAllKicks(maxCushions) {
   return out;
 }
 
+var _dlPractice = null;    // { set, i } while a practice shot is on the table
+/* PRACTICE SHOTS. Not made up: each layout was found by searching with this
+   lesson's own geometry for a table where that kind of kick is the clean
+   answer, so the route it teaches is the route the lesson then draws. */
+var DL_PRACTICE = {
+  shortrail: { name: 'Short-rail kick', shots: [
+    { cue:{x:130,y:133}, obj:{x:81,y:67},  obs:[{x:100,y:92}],  key:'left',
+      note:'The blocker covers the direct line. Go off the <b>left short rail</b>.' },
+    { cue:{x:236,y:128}, obj:{x:236,y:57}, obs:[{x:236,y:96}],  key:'right',
+      note:'Straight up the table is blocked. The <b>right short rail</b> brings it back.' },
+    { cue:{x:97,y:97},   obj:{x:250,y:52}, obs:[{x:153,y:81}],  key:'left',
+      note:'Going away from the ball to come back to it: off the <b>left short rail</b>.' } ] },
+  longrail: { name: 'Long-rail kick', shots: [
+    { cue:{x:287,y:45},  obj:{x:130,y:144}, obs:[{x:229,y:82}],  key:'top',
+      note:'Blocked on the diagonal. Off the <b>top long rail</b> and down to the ball.' },
+    { cue:{x:271,y:94},  obj:{x:79,y:139},  obs:[{x:171,y:117}], key:'bottom',
+      note:'A shallow angle: off the <b>bottom long rail</b>.' },
+    { cue:{x:268,y:72},  obj:{x:175,y:140}, obs:[{x:209,y:116}], key:'top',
+      note:'The ball is near the bottom rail. Go the long way, off the <b>top rail</b>.' } ] },
+  tworail: { name: 'Two-rail kick', shots: [
+    { cue:{x:286,y:148}, obj:{x:122,y:140}, obs:[{x:225,y:145},{x:303,y:125},{x:253,y:150}], key:'right-bottom',
+      note:'No one-rail route is clear. <b>Right short rail, then the bottom rail.</b>' },
+    { cue:{x:167,y:47},  obj:{x:238,y:50},  obs:[{x:209,y:49},{x:305,y:105},{x:192,y:69}],   key:'top-right',
+      note:'Tied up along the top rail. <b>Top rail, then round the right short rail.</b>' },
+    { cue:{x:85,y:79},   obj:{x:315,y:77},  obs:[{x:207,y:78},{x:97,y:136},{x:170,y:79}],    key:'left-top',
+      note:'Full length of the table, blocked twice. <b>Left short rail, then the top rail.</b>' } ] },
+  pot: { name: 'Kick to pot', shots: [
+    { cue:{x:302,y:145}, obj:{x:238,y:85},  obs:[], pocket:1, key:'left',
+      note:'Send the cue ball to the <b>far-left short rail</b> and back, to make the red in the <b>top-right corner</b>.' },
+    { cue:{x:191,y:41},  obj:{x:246,y:126}, obs:[], pocket:4, key:'bottom',
+      note:'Off the <b>bottom rail</b> to make it in the <b>top side pocket</b>.' },
+    { cue:{x:191,y:41},  obj:{x:79,y:88},   obs:[], pocket:2, key:'top',
+      note:'Off the <b>top rail</b> to make it in the <b>bottom-left corner</b>.' } ] }
+};
+var DL_PRACTICE_ORDER = ['shortrail', 'longrail', 'tworail', 'pot'];
+function dlPracticeLoad(set) {
+  var S = DL_PRACTICE[set]; if (!S) return;
+  var i = (_dlPractice && _dlPractice.set === set) ? (_dlPractice.i + 1) % S.shots.length : 0;
+  var sh = S.shots[i];
+  _dlCue = { x: sh.cue.x, y: sh.cue.y }; _dlObj = { x: sh.obj.x, y: sh.obj.y };
+  _dlObs = sh.obs.map(function (o) { return { x: o.x, y: o.y }; });
+  _dlPocket = (typeof sh.pocket === 'number') ? sh.pocket : null;
+  _dlRouteKey = sh.key; _dlPractice = { set: set, i: i };
+  dlRender();
+}
+function dlClean(r) { return r && !r.blocked && !r.objBlocked && !r.tight && !r.scratch && !r.pocket; }
+/* The route on show: the one the player picked if it is still clean, else
+   the simplest clean one, else whatever is least bad (so the read can say
+   what is wrong with it). */
+function dlBest(kicks) {
+  if (!kicks.length) return null;
+  if (_dlRouteKey) for (var i = 0; i < kicks.length; i++) if (kicks[i].key === _dlRouteKey && dlClean(kicks[i])) return kicks[i];
+  for (var j = 0; j < kicks.length; j++) if (dlClean(kicks[j])) return kicks[j];
+  return kicks[0];
+}
+function dlRailShort(r) {
+  return r === 'top' ? 'Top' : r === 'bottom' ? 'Bottom' : r === 'left' ? 'Left short' : 'Right short';
+}
+function dlPickRoute(key) { _dlRouteKey = (_dlRouteKey === key) ? null : key; dlRender(); }
 function dlRailLabel(r) {
   return r === 'top' ? 'the top rail' : r === 'bottom' ? 'the bottom rail'
        : r === 'left' ? 'the left short rail' : 'the right short rail';
@@ -6448,6 +6570,7 @@ function dlPointerMove(evt) {
     if (_dlDrag.kind === 'cue') _dlCue = q;
     else if (_dlDrag.kind === 'obj') _dlObj = q;
     else _dlObs[_dlDrag.idx] = q;
+    _dlPractice = null;
     dlRender();
   } catch (_) {}
 }
@@ -6457,13 +6580,22 @@ function dlPointerUp(evt) {
     var p = dlEvtPoint(evt);
     if (_dlDrag) {
       /* A tap on a blocker (no drag) removes it. */
-      if (!_dlDrag.moved && _dlDrag.kind === 'obs') _dlObs.splice(_dlDrag.idx, 1);
+      if (!_dlDrag.moved && _dlDrag.kind === 'obs') { _dlObs.splice(_dlDrag.idx, 1); _dlPractice = null; }
       _dlDrag = null;
       dlRender();
       return;
     }
     if (!p) return;
+    if (_dlMode === 'pkt') {
+      /* Tap a pocket to pot the red there; tap it again for a plain hit. */
+      var pks = dlPockets(), near = -1, nd = dlGrabRadius() * 1.4;
+      for (var pi = 0; pi < pks.length; pi++) { var dd = Math.hypot(pks[pi].x - p.x, pks[pi].y - p.y); if (dd < nd) { nd = dd; near = pi; } }
+      if (near < 0) _dlNote = 'pocket';
+      else { _dlPocket = (_dlPocket === near) ? null : near; _dlRouteKey = null; _dlPractice = null; }
+      dlRender(); return;
+    }
     var q = dlInside(p);
+    _dlPractice = null;
     if (_dlMode === 'cue')      { if (!dlOverlaps(q, 'cue')) { _dlCue = q; _dlMode = 'obj'; } }
     /* Placing the object ball used to auto-advance into BLOCKER mode. People
        then went back to nudge the cue ball, missed it slightly, and got a
@@ -6581,8 +6713,15 @@ function dlSvg() {
   }
 
   var kicks = dlAllKicks();
-  var best = kicks.length ? kicks[0] : null;
+  var best = dlBest(kicks);
   var direct = !dlSegBlocked(_dlCue, _dlObj);
+  var gh = dlGhost();
+
+  /* The chosen pocket, and the ghost-ball spot the kick is aimed at. */
+  if (gh) {
+    p.push('<circle cx="' + gh.pocket.x + '" cy="' + gh.pocket.y + '" r="11" fill="none" stroke="#2dff8a" stroke-width="2.2"/>');
+    p.push('<circle cx="' + gh.x + '" cy="' + gh.y + '" r="' + DL_R + '" fill="none" stroke="#f4efe2" stroke-width="1.1" stroke-dasharray="2 2" opacity=".9"/>');
+  }
 
   // the straight line, so you can see WHY a kick is needed
   p.push('<line x1="' + _dlCue.x + '" y1="' + _dlCue.y + '" x2="' + _dlObj.x + '" y2="' + _dlObj.y +
@@ -6627,7 +6766,13 @@ function dlSvg() {
 
   /* Where the object ball ends up - dotted, so it reads as a projection
      rather than the aiming line. */
-  if (best && !best.blocked) {
+  if (best && !best.blocked && gh) {
+    /* Kick to pot: the object ball's line is the line to the chosen pocket. */
+    var oc2 = best.objBlocked ? '#c46a4a' : '#2dff8a';
+    p.push('<line x1="' + _dlObj.x + '" y1="' + _dlObj.y + '" x2="' + gh.pocket.x + '" y2="' + gh.pocket.y +
+           '" stroke="' + oc2 + '" stroke-width="1.8" stroke-dasharray="3 4" stroke-linecap="round"/>');
+    if (!best.objBlocked) txt(gh.pocket.x, gh.pocket.y + (gh.pocket.y < 100 ? 22 : -14), 'IN', '#2dff8a', 700, 10);
+  } else if (best && !best.blocked) {
     var op = dlObjectPath(best.hit);
     if (op) {
       var oc = op.blocked ? '#c46a4a' : (op.potted ? '#2dff8a' : '#e7ddc7');
@@ -6693,14 +6838,43 @@ function dlRender() {
   if (!host) return;
   host.innerHTML = dlSvg();
 
-  ['cue', 'obj', 'obs'].forEach(function (m) {
+  ['cue', 'obj', 'obs', 'pkt'].forEach(function (m) {
     var b = document.getElementById('dl-mode-' + m);
     if (b) b.classList.toggle('on', _dlMode === m);
   });
 
   var kicks = dlAllKicks();
-  var best = kicks.length ? kicks[0] : null;
+  var best = dlBest(kicks);
   var direct = !dlSegBlocked(_dlCue, _dlObj);
+  var gh = dlGhost();
+
+  /* ROUTES. Every clean route is a button, so the player can choose how the
+     cue ball goes round - off the far-left short rail, two rails, whatever
+     suits - instead of being handed only the shortest. */
+  var rb = document.getElementById('dl-routes');
+  if (rb) {
+    var clean = kicks.filter(dlClean).slice(0, 8);
+    rb.innerHTML = clean.length > 1
+      ? '<div class="dl-routes-h">' + clean.length + ' clean routes \u00b7 tap one to see it</div>' +
+        clean.map(function (k) {
+          return '<button type="button" class="' + (best && k.key === best.key ? 'on' : '') + (k.cushions > 1 ? ' wide' : '') + '" onclick="dlPickRoute(\'' + k.key + '\')">' +
+                 k.rails.map(dlRailShort).join(' \u2192 ') + ' <b>' +
+                 k.nums.map(function (v) { return v.toFixed(1); }).join(' \u203a ') + '</b></button>';
+        }).join('')
+      : '';
+  }
+
+  var pr = document.getElementById('dl-practice');
+  if (pr) {
+    var cur = _dlPractice && DL_PRACTICE[_dlPractice.set];
+    pr.innerHTML = '<div class="dl-practice-h">PRACTICE SHOTS \u00b7 tap again for the next one</div>' +
+      DL_PRACTICE_ORDER.map(function (k) {
+        var on = _dlPractice && _dlPractice.set === k;
+        return '<button type="button" class="' + (on ? 'on' : '') + '" onclick="dlPracticeLoad(\'' + k + '\')">' +
+               DL_PRACTICE[k].name + (on ? ' \u00b7 ' + (_dlPractice.i + 1) + '/' + DL_PRACTICE[k].shots.length : '') + '</button>';
+      }).join('') +
+      (cur ? '<div class="dl-practice-note">' + cur.shots[_dlPractice.i].note + '</div>' : '');
+  }
 
   var cnt = document.getElementById('dl-obs-count');
   if (cnt) cnt.textContent = _dlObs.length ? '(' + _dlObs.length + '/' + DL_MAXOBS + ')' : '';
@@ -6712,6 +6886,10 @@ function dlRender() {
     else if (_dlNote === 'overlap') msg = '<b>Too close</b> \u00b7 balls can&rsquo;t overlap';
     else if (_dlMode === 'cue')     msg = 'Tap to place the <b>cue ball</b> \u00b7 drag to adjust';
     else if (_dlMode === 'obj')     msg = 'Tap to place the <b>ball to hit</b> \u00b7 drag to adjust';
+    else if (_dlNote === 'pocket')  msg = 'Tap right on a <b>pocket</b>';
+    else if (_dlMode === 'pkt')     msg = (_dlPocket === null)
+      ? 'Tap a <b>pocket</b> to make the red ball in it'
+      : 'Making it in <b>' + dlPockets()[_dlPocket].name.replace(/^the /, '') + '</b> \u00b7 tap it again for a plain hit';
     else if (_dlObs.length >= DL_MAXOBS)
                                     msg = '<b>Blockers full</b> \u00b7 tap one to remove \u00b7 drag to move';
     else msg = '<b>Tap to add</b> \u00b7 tap one to remove \u00b7 drag to move';
@@ -6721,9 +6899,13 @@ function dlRender() {
 
   var eq = document.getElementById('dl-eq');
   if (eq) {
-    if (!best) {
+    if (!best && gh) {
       eq.className = 'dl-eq bad';
-      eq.innerHTML = '<div class="warn">No one-cushion kick reaches from there. Move a ball and try again.</div>';
+      eq.innerHTML = '<div class="warn">No kick of up to three cushions makes it in ' + gh.pocket.name +
+                     ' from here \u2014 the cut would be too thin. Try another pocket, or move a ball.</div>';
+    } else if (!best) {
+      eq.className = 'dl-eq bad';
+      eq.innerHTML = '<div class="warn">No kick reaches from there. Move a ball and try again.</div>';
     } else if (best.blocked) {
       eq.className = 'dl-eq bad';
       eq.innerHTML = '<div class="warn">Every one-rail kick is blocked by another ball. ' +
@@ -6747,16 +6929,25 @@ function dlRender() {
                        ? '<div class="dl-pocket">\u26a0 The cue ball is right up against that rail \u2014 you can&rsquo;t get a ' +
                          'level cue behind it to shoot into it. Move the cue ball off the cushion, or play a different route.</div>'
                        : '') +
-                     (function () {
+                     (gh
+                       ? (best.objBlocked
+                           ? '<div class="dl-pocket">Another ball sits on the red&rsquo;s line to ' + gh.pocket.name + '.</div>'
+                           : '<div class="dl-made">\u2713 The red goes in <span style="font-weight:700;color:#dcffe9">' + gh.pocket.name + '</span> \u2014 a ' + best.cut + '\u00b0 cut off the kick.</div>')
+                       : '') +
+                     (gh ? '' : (function () {
                         var o = dlObjectPath(best.hit);
                         if (!o) return '';
                         if (o.blocked) return '<div class="dl-pocket">The object ball would hit another ball on its way out.</div>';
                         if (o.potted)  return '<div class="dl-made">\u2713 The object ball runs to <b>' + o.potted.name + '</b>.</div>';
-                        return '<div class="dl-mirror">No pocket on the object ball&rsquo;s line \u2014 this is a hit, not a pot.</div>';
-                      })() +
+                        return '<div class="dl-mirror">No pocket on the object ball&rsquo;s line \u2014 this is a hit, not a pot. ' +
+                               'Tap <b>&#127919; Pocket</b> to pick one and the kick is worked out to make it.</div>';
+                      })()) +
                      (direct
-                       ? '<div class="dl-mirror">Nothing is blocking the direct shot &mdash; you wouldn&rsquo;t ' +
-                         'normally kick here, but the read still works.</div>'
+                       ? (gh
+                           ? '<div class="dl-mirror">The direct shot is open, so in a game you would shoot it straight. ' +
+                             'This is the kick for when it is not &mdash; add a blocker to see it as a real escape.</div>'
+                           : '<div class="dl-mirror">Nothing is blocking the direct shot &mdash; you wouldn&rsquo;t ' +
+                             'normally kick here, but the read still works.</div>')
                        : '');
     }
   }
@@ -6774,10 +6965,13 @@ function dlRender() {
       ? 'The only route starts off <b>' + dlRailLabel(best.rails[0]) + '</b> \u2014 but the cue ball is sitting on that ' +
         'cushion, so there is no room to get a cue behind it. On a real table you would move on to another shot.'
       : (best.cushions === 1
-          ? 'Pick a rail. Here the shortest clean route is off <b>' + dlRailLabel(best.rails[0]) + '</b>.'
+          ? (_dlRouteKey === best.key ? 'You picked the route off <b>' : 'Pick a rail. Here the shortest clean route is off <b>') + dlRailLabel(best.rails[0]) + '</b>.'
           : 'One cushion will not reach, so this is a <b>' + best.cushions + '-cushion</b> route: ' +
             '<b>' + _route + '</b>. The rings are numbered in the order you hit them.'));
-    li.push('<b>Mirror the target</b> across that rail, then draw a line from the cue ball to the mirror image.');
+    li.push(gh
+      ? 'To make it, the cue ball must arrive at the <b>ghost-ball spot</b> (the dotted ring): two ball-radii back from the red, straight away from ' +
+        gh.pocket.name + '. <b>Mirror that spot</b> across the rail, then draw a line from the cue ball to the mirror image.'
+      : '<b>Mirror the target</b> across that rail, then draw a line from the cue ball to the mirror image.');
     li.push(best.cushions === 1
       ? 'Where it crosses is your contact point &mdash; <b>diamond ' + best.n.toFixed(1) +
         '</b>. Angle out matches angle in.'
@@ -6788,7 +6982,8 @@ function dlRender() {
       li.push('<b>Careful:</b> that line takes the cue ball over ' + best.scratch.name +
               ' on the way \u2014 it would drop in. The geometry is right, the shot is a foul.');
     }
-    var op2 = dlObjectPath(best.hit);
+    var op2 = gh ? null : dlObjectPath(best.hit);
+    if (gh && !best.objBlocked) li.push('<b>It goes.</b> The red runs to ' + gh.pocket.name + ' \u2014 the green dotted line.');
     if (op2) {
       li.push(op2.blocked
         ? 'The object ball then runs into another ball \u2014 worth knowing before you commit.'
@@ -6796,11 +6991,7 @@ function dlRender() {
             ? '<b>It goes.</b> The object ball runs to ' + op2.potted.name + ' \u2014 the green dotted line.'
             : 'The object ball runs to a cushion, not a pocket \u2014 a hit, not a pot.'));
     }
-    if (kicks.length > 1) {
-      var alts = kicks.slice(1).filter(function (k) { return !k.blocked && !k.pocket && k.cushions === 1; })
-                      .slice(0, 3).map(function (k) { return dlRailLabel(k.rail) + ' at ' + k.n.toFixed(1); });
-      if (alts.length) li.push('Other one-rail routes that also work: <b>' + alts.join('</b>, <b>') + '</b>.');
-    }
+    if (kicks.filter(dlClean).length > 1) li.push('The other clean routes are the buttons under the read-out \u2014 tap one to see it drawn.');
   } else {
     li.push('Move the cue ball or the target until a clean rail route appears.');
   }
@@ -12975,7 +13166,7 @@ try {
         <path d="M12 50 L30 24 L52 48" fill="none" stroke="#e8c766" stroke-width="2.4" stroke-dasharray="4 3.5" stroke-linecap="round" stroke-linejoin="round"/>
         <circle cx="30" cy="24" r="3.4" fill="#e8c766"/><circle cx="12" cy="52" r="6" fill="#f2ece0" stroke="#b9b0a0" stroke-width="1"/>
       </svg></span>
-      <span class="hub-txt"><b>LEARN THE DIAMONDS</b><span>One-rail kicks, worked out on your own layout</span></span>
+      <span class="hub-txt"><b>LEARN THE DIAMONDS</b><span>Kicks and kick-to-pot, off any rail, on your own layout</span></span>
       <span class="hub-go">&rsaquo;</span>
     </button>
 
@@ -13045,8 +13236,8 @@ try {
       <button class="dl-x x-btn" onclick="dismissDiamondExplainer()" aria-label="Close">&#10005;</button>
     </div>
     <div class="dl-scroll">
-      <div class="dl-rule">the mirror method &middot; one&#8209;rail kicks</div>
-      <p class="dl-lead"><b>Long rails</b> run <b>0&ndash;8</b> (4 is the side pocket). <b>Short rails</b> run <b>0&ndash;4</b>. That&rsquo;s how you name a spot on a cushion.<br><br><b>Put the balls where yours are.</b> Tap to move them, drag to fine&#8209;tune. It finds the kick off whichever rail is cleanest, reads the contact point as a diamond number, and shows where the object ball ends up.</p>
+      <div class="dl-rule">the mirror method &middot; kicks off one, two or three rails</div>
+      <p class="dl-lead"><b>Long rails</b> run <b>0&ndash;8</b> (4 is the side pocket). <b>Short rails</b> run <b>0&ndash;4</b>. That&rsquo;s how you name a spot on a cushion.<br><br><b>Put the balls where yours are.</b> Tap to move them, drag to fine&#8209;tune. It finds the kick off whichever rail is cleanest, reads the contact point as a diamond number, and shows where the object ball ends up. Tap <b>&#127919; Pocket</b> and a pocket to have it worked out to <b>make</b> the ball there. Every clean route is a button under the read-out, and the <b>practice shots</b> set up short-rail, long-rail and two-rail kicks for you.</p>
       <div class="dl-diagram" id="dl-diagram"></div>
       <div class="dl-key">
         <span><i style="background:#f4efe2"></i>cue ball</span>
@@ -13058,9 +13249,12 @@ try {
         <button type="button" id="dl-mode-cue" class="on" onclick="dlSetMode('cue')"><i class="dl-dot" style="background:#f4efe2"></i> Cue ball</button>
         <button type="button" id="dl-mode-obj" onclick="dlSetMode('obj')"><i class="dl-dot" style="background:#cc2222"></i> Ball to hit</button>
         <button type="button" id="dl-mode-obs" onclick="dlSetMode('obs')"><i class="dl-dot" style="background:#3b2f4d;border:1px solid #8f7fb0"></i> Blocker <span id="dl-obs-count"></span></button>
+        <button type="button" id="dl-mode-pkt" onclick="dlSetMode('pkt')">&#127919; Pocket</button>
       </div>
       <div class="dl-try" id="dl-try">Tap the table to move the <b>cue ball</b></div>
       <div class="dl-eq" id="dl-eq"></div>
+      <div class="dl-routes" id="dl-routes"></div>
+      <div class="dl-practice" id="dl-practice"></div>
       <div class="dl-eq-actions">
         <button type="button" onclick="dlClearBlockers()">&#10005; Clear blockers</button>
         <button type="button" onclick="dlReset()">&#8635; Start over</button>
