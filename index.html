@@ -2393,7 +2393,7 @@ body.hist-mode #history-panel {
       <div class="hdr-emblem">🎱</div>
       <div style="flex:1">
         <div class="hdr-name"><span>Curran&rsquo;s Shot Reader</span></div>
-        <div class="hdr-sub">See the table. Read the shot. <span style="color:var(--gold-dim);opacity:.7">· V11.24.1209</span></div>
+        <div class="hdr-sub">See the table. Read the shot. <span style="color:var(--gold-dim);opacity:.7">· V11.24.0451</span></div>
       </div>
       <div style="flex:1 1 100%;display:flex;gap:6px;justify-content:flex-end;margin-top:7px">
         <button class="help-btn" id="hdr-tour-btn" onclick="showWelcome()" title="Welcome tour"><span style="font-size:14px">👋</span> Tour</button>
@@ -2897,6 +2897,7 @@ body.hist-mode #history-panel {
     <div id="align-explain">✨ <strong>Auto finds the table for you.</strong> Use it first — only use <strong>📐 Align Table by hand</strong> if Auto can&rsquo;t see the corners.</div>
     <button class="btn" id="auto-align-btn" onclick="autoAlignTable()" title="Let the app find the table"><span style="font-size:19px">✨</span> AUTO&nbsp;—&nbsp;FIND MY TABLE</button>
     <button class="btn" id="step2-anchor" onclick="startAlign()"><span style="font-size:15px">📐</span> Align Table by hand <span class="sub">— tap the 4 corners</span></button>
+    <button class="btn" id="half-align-btn" onclick="startAlignHalf()"><span style="font-size:15px">📐</span> Near end out of the photo? <span class="sub">— tap 4 pockets</span></button>
     <!-- Shown only while a table is aligned. The side pockets are the tell:
          if they sit on the SHORT rails, the long rail was picked wrong. -->
     <button class="btn" id="swap-rails-btn" onclick="swapTableRails()" style="display:none"><span style="font-size:15px">⇄</span> Side pockets on the short rails? <span class="sub">— tap to fix</span></button>
@@ -5523,13 +5524,52 @@ function geoP(m) {
   }
   return m;
 }
+/* One ball's diameter in pixels: its own detected box, else the middle-sized
+   detected ball (a ball the player marked by hand has no box), else 0 - and
+   0 means "no ruler", so the cut falls back to the ball's centre. */
+function ballPxDiameter(m, W, H) {
+  if (m && m._bw > 0 && m._bh > 0) return (m._bw * W + m._bh * H) / 2;
+  const ds = (typeof marks !== 'undefined' ? marks : []).filter(b => b._bw > 0 && b._bh > 0).map(b => (b._bw * W + b._bh * H) / 2).sort((a, b) => a - b);
+  return ds.length ? ds[ds.length >> 1] : 0;
+}
 function computeCutAngle(cue, obj, pocket) {
   cue = geoP(cue); obj = geoP(obj); pocket = geoP(pocket);
   if (!cue || !obj || !pocket) return null;
-  const dxIn = obj.fx-cue.fx, dyIn = obj.fy-cue.fy;
   const dxOut= pocket.fx-obj.fx, dyOut= pocket.fy-obj.fy;
-  const lenIn = Math.hypot(dxIn,dyIn), lenOut = Math.hypot(dxOut,dyOut);
-  if (!lenIn || !lenOut) return null;
+  const lenOut = Math.hypot(dxOut,dyOut);
+  if (!lenOut) return null;
+  /* GHOST BALL. The cue ball travels to the ghost-ball spot - two radii back
+     from the object ball, straight away from the pocket - not to the object
+     ball's centre. Measuring to the centre was ~3 degrees out at three feet
+     and 15+ out at seven inches: on a real overhead photo it called an 89
+     degree (impossible) cut "74, tough" and a 66 degree cut "52, makeable".
+     Aligned tables only, where BALL_R() is the true ball size on the slate;
+     unaligned photo space has no reliable ball size, so it keeps the centre. */
+  let ax = obj.fx, ay = obj.fy;
+  if (window._tHinv) { const r2 = 2 * BALL_R(); ax = obj.fx - dxOut / lenOut * r2; ay = obj.fy - dyOut / lenOut * r2; }
+  else {
+    /* UNALIGNED (a player's-eye photo, or any table not lined up). No table
+       scale, but the ball itself is a ruler: its detected box is one ball
+       across, in pixels, right where the ghost spot sits. Work in PIXELS -
+       the old fraction space stretched every angle on a non-square photo -
+       and step one detected diameter back from the ball. Still an estimate:
+       on a low camera the cloth is foreshortened and no single photo says
+       by how much; the Guide says so (What The App Reads). */
+    const W = (typeof canvas !== 'undefined' && canvas && canvas.width) || 0, H = (W && canvas.height) || 0;
+    if (W && H) {
+      const D = ballPxDiameter(obj, W, H);
+      const ox = obj.fx * W, oy = obj.fy * H, pdx = pocket.fx * W - ox, pdy = pocket.fy * H - oy, pl = Math.hypot(pdx, pdy);
+      if (!pl) return null;
+      const gx = ox - pdx / pl * D, gy = oy - pdy / pl * D;
+      const ix = gx - cue.fx * W, iy = gy - cue.fy * H, il = Math.hypot(ix, iy);
+      if (!il) return null;
+      const dp = (ix * pdx + iy * pdy) / (il * pl);
+      return Math.min(Math.round(Math.acos(Math.max(-1, Math.min(1, dp))) * 180 / Math.PI), 90);
+    }
+  }
+  const dxIn = ax-cue.fx, dyIn = ay-cue.fy;
+  const lenIn = Math.hypot(dxIn,dyIn);
+  if (!lenIn) return null;
   const dot = (dxIn*dxOut+dyIn*dyOut)/(lenIn*lenOut);
   return Math.min(Math.round(Math.acos(Math.max(-1,Math.min(1,dot)))*180/Math.PI), 90);
 }
@@ -8000,8 +8040,56 @@ function autoAlignTable() {
     setStatus('Auto-align hit a snag \u2014 tap \ud83d\udcd0 Align Table and tap the 4 corners','warn');
   }
 }
+/* FAR-HALF ALIGNMENT. A photo from behind the cue shows the far end of the
+   table but not the near corners, so the four-corner align can't be done and
+   every angle was measured on the squashed photo - checked against the real
+   geometry of such a photo, 25-29 degrees out on average. The two far corner
+   pockets and the two side pockets are a known rectangle on every table (the
+   table's width by half its length), so four taps fix the perspective; the
+   near corners are worked out from them and the ordinary align takes over. */
+var _alignHalf = false;
+var HALF_NAMES = ['FAR-LEFT corner pocket', 'FAR-RIGHT corner pocket', 'RIGHT side pocket', 'LEFT side pocket'];
+function startAlignHalf() {
+  startAlign();
+  if (!aligning) return;
+  _alignHalf = true;
+  setStatus('Far end: tap the ' + HALF_NAMES[0] + ' (1 of 4) \u2014 left and right as you look at the photo.', 'gold');
+}
+/* Four taps -> the two near corners, extrapolated through the same rectangle.
+   Returns false when the taps cannot be the far half of a table. */
+function finishAlignHalf() {
+  _alignHalf = false;
+  var t = marks.filter(function (m) { return m.type === 'corner'; }).sort(function (a, b) { return a.idx - b.idx; });
+  if (t.length < 4 || !canvas.width) return false;
+  var W = canvas.width, H = canvas.height;
+  var dst = t.map(function (c) { return { x: c.fx * W, y: c.fy * H }; });
+  /* The four taps, in order, must go round a proper four-sided shape - taps
+     out of order cross over themselves. Either way round is fine (mirror
+     order is handled like an anticlockwise four-corner align). */
+  var turn = [0, 1, 2, 3].map(function (i) {
+    var a = dst[i], b = dst[(i + 1) % 4], c = dst[(i + 2) % 4];
+    return (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+  });
+  if (!(turn.every(function (v) { return v > 0; }) || turn.every(function (v) { return v < 0; }))) return false;
+  var Hh = computeHomography([{x:0,y:0},{x:1,y:0},{x:1,y:0.5},{x:0,y:0.5}], dst);
+  if (!Hh) return false;
+  var nr = applyHomography(Hh, 1, 1), nl = applyHomography(Hh, 0, 1);
+  if (!nr || !nl || !isFinite(nr.x + nr.y + nl.x + nl.y)) return false;
+  /* The near corners must lie on past the side pockets, along each long rail. */
+  var past = function (side, far, near) { return (near.x - side.x) * (side.x - far.x) + (near.y - side.y) * (side.y - far.y) > 0; };
+  if (!past(dst[3], dst[0], nl) || !past(dst[2], dst[1], nr)) return false;
+  marks = marks.filter(function (m) { return m.type !== 'corner'; });
+  [dst[0], dst[1], nr, nl].forEach(function (p, i) { marks.push({ type: 'corner', idx: i, fx: p.x / W, fy: p.y / H }); });
+  window._tLongFlip = false;
+  rebuildFromCorners();
+  /* The far rail is a SHORT rail - we know that, so don't let the shape guess
+     decide it from corners that are partly extrapolated. */
+  if (window._tCanonLong === 'x') { window._tLongFlip = true; rebuildFromCorners(); }
+  return true;
+}
 function startAlign() {
   if (!sourceImg) { setStatus('Take or upload a photo first','warn'); return; }
+  _alignHalf = false;
   // Option A: aligning starts a clean slate — old pockets and any old box go.
   marks = marks.filter(m => m.type !== 'corner' && m.type !== 'pocket');
   window._tableH = null; window._tHf = null; window._tHinv = null; window._tCanonLong = null; window._tLongFlip = false;
@@ -8795,6 +8883,26 @@ function kickLegBlocked(a, b, exclude, allBalls, R) {
   }
   return false;
 }
+/* Is anything in the cue ball's way to the GHOST-BALL spot (where it really
+   goes), not to the object ball's centre? A ball sitting on the ghost spot
+   blocks too. The target itself is excluded by identity. Unaligned photos
+   keep the old cue-to-centre check (no reliable ball size there). */
+function cueLaneBlocked(cue, ball, pocket, allBalls) {
+  if (!window._tHinv || !pocket) return pathBlocked(cue, ball, allBalls);
+  const c = geoP(cue), b = geoP(ball), p = geoP(pocket), R = BALL_R();
+  const ux = p.fx - b.fx, uy = p.fy - b.fy, L = Math.hypot(ux, uy);
+  if (!L) return false;
+  const g = { fx: b.fx - ux / L * 2 * R, fy: b.fy - uy / L * 2 * R };
+  const vx = g.fx - c.fx, vy = g.fy - c.fy, L2 = vx * vx + vy * vy;
+  for (const o of allBalls) {
+    if (o === ball) continue;
+    const q = geoP(o);
+    if (Math.hypot(q.fx - c.fx, q.fy - c.fy) < R * 0.5) continue;      // the cue ball itself
+    const t = L2 > 0 ? ((q.fx - c.fx) * vx + (q.fy - c.fy) * vy) / L2 : 0;
+    if (t > 0.02 && pointToSegmentDist(q, c, g) < 2 * R) return true;
+  }
+  return false;
+}
 function scoreShot(cue, ball, pocket, allBalls) {
   const cut = computeCutAngle(cue, ball, pocket);
   if (cut === null) return null;
@@ -8813,7 +8921,7 @@ function scoreShot(cue, ball, pocket, allBalls) {
   if (pathBlocked(ball, pocket, allBalls)) { d += 10; blocked = true; }
   // Also check the CUE -> object-ball path (a ball parked in the cue's lane
   // makes the shot a combo/carom, not a clean direct — bury it like a block).
-  if (cue && pathBlocked(cue, ball, allBalls)) { d += 10; blocked = true; }
+  if (cue && cueLaneBlocked(cue, ball, pocket, allBalls)) { d += 10; blocked = true; }
   d = Math.max(1, Math.min(10, Math.round(d)));
   /* Hard stop LAST. Applied before the distance bonus, a close-range 90° cut
      got the "nice and close" discount and slipped back to 9 — a shot that
@@ -9091,7 +9199,7 @@ function suggestShot() {
     _awaitingPocket = true;
     if (typeof renderCanvas === 'function') renderCanvas();
     titl.textContent = 'Which Pocket?';
-    body.textContent = 'This photo isn\u2019t an aligned full table, so I can\u2019t work out where the pockets are \u2014 and I\u2019d rather ask than guess.\n\nTap the pocket you\u2019re aiming at, right on the photo. That\u2019s all I need: cue ball, object ball, and one pocket.\n\nSingle pocket = quick, but no diamonds. \ud83d\udcd0 Align Table = full geometry and sharper angles.\n\n(For a whole-table photo instead, use \ud83d\udcd0 Align Table or \u2728 Auto in Step 2 and every pocket gets placed for you.)';
+    body.textContent = 'This photo isn\u2019t an aligned full table, so I can\u2019t work out where the pockets are \u2014 and I\u2019d rather ask than guess.\n\nTap the pocket you\u2019re aiming at, right on the photo. That\u2019s all I need: cue ball, object ball, and one pocket.\n\nSingle pocket = quick, but no diamonds. \ud83d\udcd0 Align Table = full geometry and sharper angles.\n\n(For a whole-table photo instead, use \ud83d\udcd0 Align Table or \u2728 Auto in Step 2 and every pocket gets placed for you. Shooting from behind the cue with the near end out of the picture? Tap \ud83d\udcd0 Near end out of the photo? \u2014 four taps line it up and give true angles.)';
     sug.classList.add('show'); setTimeout(function(){ sug.scrollIntoView({behavior:'smooth', block:'nearest'}); }, 60); return;
   }
   _awaitingPocket = false;
@@ -9467,10 +9575,15 @@ function suggestShot() {
      direct shot is barely real and at 85+ it is not one, so no phrasing of
      "commit" is honest. Route the player to the escapes instead. */
   var _blockedNow = _scored && _scored.blocked;
-  if (_blockedNow)
-    plainHeadline = '\ud83d\uded1 The direct path to this ball is blocked \u2014 there is no clean shot at it. Check the kick or combo option below, or play safe.\n\n';
+  /* Angle before blockage: when no ball has an angle into the chosen pocket,
+     that is the reason there is no shot, even if a ball also happens to sit
+     in some lane. It used to say "blocked" with nothing in the way. */
+  if (cutAngle !== null && cutAngle >= 90)
+    plainHeadline = '\ud83d\uded1 No ball has an angle into this pocket from here \u2014 the cue ball can\u2019t reach the side of a ball that would send it there. Use the kick or combo options below, or play safe.\n\n';
   else if (cutAngle !== null && cutAngle >= 85)
     plainHeadline = '\ud83d\uded1 A ' + cutAngle + '\u00b0 cut isn\u2019t a real shot \u2014 at this angle the cue ball can only graze the ball. Use the kick or combo options below, or play safe.\n\n';
+  else if (_blockedNow)
+    plainHeadline = '\ud83d\uded1 The direct path to this ball is blocked \u2014 there is no clean shot at it. Check the kick or combo option below, or play safe.\n\n';
   else if (cutAngle !== null && cutAngle >= 75)
     plainHeadline = '\ud83d\uded1 This cut is about as thin as they come \u2014 very low percentage. Check the kick or combo options below before committing.\n\n';
   else
@@ -9481,10 +9594,34 @@ function suggestShot() {
   /* VERDICT: is it on, which ball, which pocket - and any warning that must
      not sit behind a tap. Built only from values already decided above. */
   var verdict = plainHeadline.trim();
-  if (targetBall && !_blockedNow) {
+  if (targetBall && !_blockedNow && !(cutAngle !== null && cutAngle >= 90)) {   // no "ball -> pocket" line under "no angle"
     verdict += '\n\ud83c\udfaf ' + capitalize(patternBallWord(targetBall)).replace(/ \(([^)]*)\)$/, ', $1')
             + (pocketInfo ? ' \u2192 ' + pocketInfo.label.toLowerCase() : '') + '.';
   }
+  /* The pocket that DOES work. When the player has picked a pocket and
+     nothing goes in it, say where a shot is instead of only offering
+     escapes - on an aligned table all six pockets are known exactly. */
+  var _noShotHere = cutAngle === null || cutAngle >= 75 || _blockedNow;
+  window._altShot = null;            // read by Table Mode and the voice too
+  if (_noShotHere && window._tHf && typeof cbPockets === 'function') {
+    try {
+      var _six = cbPockets().map(function (k) { var r = canonToRaw(k); return r ? { type: 'pocket', fx: r.fx, fy: r.fy } : null; }).filter(Boolean);
+      var _chosen = marks.filter(function (m) { return m.type === 'pocket'; });
+      var _alt = findBestShot(cue, allTargets, _six, allObstacles).ranked.filter(function (r) {
+        return !r.blocked && r.cut < 75 && !_chosen.some(function (c) { return Math.hypot(c.fx - r.pocket.fx, c.fy - r.pocket.fy) < 0.06; });
+      })[0];
+      if (_alt && _six.length === 6 && _chosen.length < 6) {
+        window._altShot = _alt;
+        verdict += '\n\ud83d\udca1 ' + capitalize(patternBallWord(_alt.ball)).replace(/ \(([^)]*)\)$/, ', $1')
+                + ' goes in the ' + (pocketCamName(_alt.pocket) || getPocketType(_alt.pocket).label.toLowerCase())
+                + ' (' + _alt.cut + '\u00b0 cut) \u2014 tap \ud83c\udfaf Change pocket to aim there.';
+      }
+    } catch (_) {}
+  }
+  /* Unaligned: every angle above came off the photo itself. On a low camera
+     that is 25+ degrees out, so say it once, with the way to fix it. */
+  if (!window._tHf && targetBall && cutAngle !== null)
+    verdict += '\n\ud83d\udcd0 Angles are estimated from the photo \u2014 line up the table ' + (simpleMode ? 'under \u2699 Change something' : 'in Step 2') + ' for true ones.';
   if (cueNote.indexOf('SCRATCH') !== -1) verdict += '\n\u26a0\ufe0f Scratch risk on a ' + (simpleMode ? 'center-ball hit' : 'stun shot') + ' \u2014 see the full read.';
   if (kickNote)  verdict += '\n\ud83c\udfb1 A kick is drawn in gold on the table.';
   if (comboNote) verdict += '\n\ud83c\udfaf There is a combo option in the full read.';
@@ -9936,6 +10073,21 @@ canvas.addEventListener('pointerdown', function(e) {
   if (aligning) {
     const idx = marks.filter(m => m.type === 'corner').length;
     marks.push({ type:'corner', idx, fx, fy });
+    if (idx + 1 >= 4 && _alignHalf) {
+      aligning = false;
+      updateAlignChrome();
+      if (!finishAlignHalf()) {
+        marks = marks.filter(function (m) { return m.type !== 'corner'; });
+        window._tableH = null; window._tHf = null; window._tHinv = null; window._tCanonLong = null; window._tLongFlip = false;
+        renderCanvas();
+        setStatus('\u26a0\ufe0f Those four points don\u2019t make the far half of a table \u2014 tap the two far CORNER pockets first, then the right and left SIDE pockets.', 'warn');
+        return;
+      }
+      renderCanvas();
+      setStatus('\u2713 Table lined up from the far end \u2014 angles are now measured on the real table. The near corners are worked out, so they may sit outside the photo.', 'live');
+      try { if (marks.some(function (m) { return m.type === 'cue'; })) suggestShot(); } catch (_) {}
+      return;
+    }
     if (idx + 1 >= 4) {
       aligning = false;
       updateAlignChrome();
@@ -9956,7 +10108,8 @@ canvas.addEventListener('pointerdown', function(e) {
     } else {
       const names = ['TOP-LEFT','TOP-RIGHT','BOTTOM-RIGHT','BOTTOM-LEFT'];
       renderCanvas();
-      setStatus('Align: tap the '+names[idx+1]+' corner ('+(idx+2)+' of 4)','gold');
+      if (_alignHalf) setStatus('Far end: tap the '+HALF_NAMES[idx+1]+' ('+(idx+2)+' of 4)','gold');
+      else setStatus('Align: tap the '+names[idx+1]+' corner ('+(idx+2)+' of 4)','gold');
     }
     return;
   }
@@ -12113,13 +12266,24 @@ function updateTableBanner() {
      break only shows in the big read, where the title is set pre-line. */
   /* No S2 / T1 here: those labels only mean something next to the picture.
      The pocket, named from where the phone stands, says which ball. */
-  elT.textContent = top.blocked ? (ball + ' \u2014\nblocked') : (ball + ' \u2192\n' + where);
+  /* NO ANGLE comes before blocked, as on the Scan page: a 90-degree "shot"
+     used to show as "Stripe -> near right corner, very low percentage". If
+     another pocket works, say which - in the same camera's-eye words. */
+  var _noAng = typeof top.cut === 'number' && top.cut >= 85, _alt = window._altShot;
+  var _altWhere = _alt ? (pocketCamName(_alt.pocket) || 'another pocket').replace(/ side pocket$/, ' side') : '';
+  /* The title stays on the pocket the picture shows; the line under it names
+     the one that works, so words and picture never disagree. */
+  elT.textContent = _noAng ? 'No angle\nfrom here'
+                  : top.blocked ? (ball + ' \u2014\nblocked') : (ball + ' \u2192\n' + where);
   _tmFitTitle();
   /* 9-Ball: the legal ball is the LOWEST number, which the AI does not read.
      Without the lowest ball set this is only the easiest ball - say so,
      rather than "good shot" on a ball the rules may not allow. */
   var _nine = (gameMode === '9ball' && !marks.some(function (m) { return m._mustHit; }));
-  elA.textContent = _nine ? 'Only if it is the lowest ball on the table \u2014 9-Ball rules.' : top.blocked
+  elA.textContent = _noAng ? (_alt ? 'Nothing goes in the ' + (pocketCamName(top.pocket) || 'pocket you chose') + '. '
+                                         + (names[_alt.ball.type] || 'Ball') + ' into the ' + _altWhere + ' does.'
+                                   : 'No ball has an angle into this pocket. Play safe, or check the kick.')
+    : _nine ? 'Only if it is the lowest ball on the table \u2014 9-Ball rules.' : top.blocked
     ? 'No clear path. Check the kick or combo option.'
     : (d <= 3 ? 'Good shot. Step in with confidence.'
      : d <= 5 ? 'Moderate. Take your time.'
@@ -12255,6 +12419,12 @@ function buildSpokenSummary() {
     if (!top || !top.ball) return '';
     var names = { obj:'solid', stripe:'stripe', eight:'eight ball' };
     var ball = names[top.ball.type] || 'ball';
+    if (typeof top.cut === 'number' && top.cut >= 85) {
+      var alt = window._altShot;
+      return alt ? 'Nothing goes in the ' + (pocketCamName(top.pocket) || 'pocket you chose') + '. '
+                   + capitalize(names[alt.ball.type] || 'ball') + ' into the ' + (pocketCamName(alt.pocket) || 'other pocket') + ' instead.'
+                 : 'No ball has an angle into this pocket. Play safe, or check the kick.';
+    }
     if (top.blocked) return 'The ' + ball + ' is blocked. Check the kick or combo option.';
     var where = pocketCamName(top.pocket)
              || (top.pocket ? String(getPocketType(top.pocket).label || 'pocket').toLowerCase() : 'pocket');
@@ -12912,6 +13082,10 @@ try {
         <div class="help-item">
           <div class="help-icon">&#129351;</div>
           <div><div class="help-item-title">Rotation Games Are The One Exception</div><div class="help-item-desc">In 9&#8209;Ball and other rotation games the number decides what is <em>legal</em>, so that one call comes from you: tap <strong>&#127919; Set Lowest Ball</strong> in Quick Setup and tap your ball. It takes a second, it gets a cyan ring, and from then on every read is built around it. In 8&#8209;Ball and straight pool nothing is missing at all &mdash; solids and stripes is the whole of what the rules need, and the app reads that already.</div></div>
+        </div>
+        <div class="help-item">
+          <div class="help-icon">&#128208;</div>
+          <div><div class="help-item-title">Photos From Behind The Cue</div><div class="help-item-desc">A photo taken low, from where you stand to shoot, squashes the far end of the table &mdash; angles measured straight off that picture can be 25&deg; out. Lining the table up removes the squash. When all four corners are in the photo, <strong>&#10024; Auto</strong> or <strong>&#128208; Align Table by hand</strong> does it. When the near end is out of the picture, tap <strong>&#128208; Near end out of the photo?</strong> &mdash; then the two far corner pockets and the two side pockets. Those four always make the same shape on any table, so the app can work out the rest. Until the table is lined up, every angle is an estimate, and the read says so.</div></div>
         </div>
         </div>
 
