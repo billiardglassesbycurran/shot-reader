@@ -1349,6 +1349,13 @@ body.scan-simple #detections-box { display:none !important; }
   background:#0d2430; color:#9fe4ff; border:1px solid #2c4a63;
 }
 #step2-anchor .sub{ opacity:.6; font-weight:400; }
+#half-align-btn{
+  width:100%; min-height:44px; font-size:13.5px; font-weight:600;
+  display:flex; align-items:center; justify-content:center; gap:7px;
+  background:#0d2430; color:#9fe4ff; border:1px solid #2c4a63;
+}
+#half-align-btn .sub{ opacity:.6; font-weight:400; }
+#sug-actions #sug-true{ background:#2a1e07; color:#ffe08a; border-color:#8a6a2c; }
 #swap-rails-btn{
   width:100%; min-height:44px; font-size:13px; font-weight:600;
   align-items:center; justify-content:center; gap:7px; flex-wrap:wrap;
@@ -2393,7 +2400,7 @@ body.hist-mode #history-panel {
       <div class="hdr-emblem">🎱</div>
       <div style="flex:1">
         <div class="hdr-name"><span>Curran&rsquo;s Shot Reader</span></div>
-        <div class="hdr-sub">See the table. Read the shot. <span style="color:var(--gold-dim);opacity:.7">· V11.24.0451</span></div>
+        <div class="hdr-sub">See the table. Read the shot. <span style="color:var(--gold-dim);opacity:.7">· V11.24.0545</span></div>
       </div>
       <div style="flex:1 1 100%;display:flex;gap:6px;justify-content:flex-end;margin-top:7px">
         <button class="help-btn" id="hdr-tour-btn" onclick="showWelcome()" title="Welcome tour"><span style="font-size:14px">👋</span> Tour</button>
@@ -2882,6 +2889,7 @@ body.hist-mode #history-panel {
         <!-- Save sits under the answer: Saved reads was only reachable from the
              empty photo box, so once a read was on screen it could not be saved. -->
         <div id="sug-actions">
+          <button type="button" class="btn" id="sug-true" onclick="getTrueAngles()" style="display:none">&#128208; True angles</button>
           <button type="button" class="btn" id="sug-save" onclick="sugSave()">&#128190; Save this read</button>
         </div>
       </div>
@@ -3079,7 +3087,12 @@ body.hist-mode #history-panel {
    CUSTOM MODEL CONFIG
    Your model hosted on Netlify
 ═══════════════════════════════════════════ */
-const DEFAULT_MODEL_URL = 'https://billiardglassesbycurran.github.io/rack-reader-v3/model.json';
+/* model-v2 is the default since V11.24 (Nov 2026): on 165 real table frames
+   through the full app it found 95% of balls with 94% typed right, against
+   65% / 44% for the original. The original stays as the fallback if model-v2
+   will not load. */
+const DEFAULT_MODEL_URL  = 'https://billiardglassesbycurran.github.io/shot-reader/model-v2/model.json';
+const ORIGINAL_MODEL_URL = 'https://billiardglassesbycurran.github.io/rack-reader-v3/model.json';
 /* TRYING A NEWLY TRAINED MODEL without replacing the one everybody uses:
    open the app once with ?model=<address of its model.json> (a full https
    address, or a folder next to index.html such as model-v2/model.json). This
@@ -3090,8 +3103,13 @@ const MODEL_URL = (function () {
   try {
     var q = new URLSearchParams(location.search).get('model');
     if (q === 'default') { localStorage.removeItem('rr_model'); return DEFAULT_MODEL_URL; }
-    if (q && /^(https:\/\/[^\s"'<>]+|[\w.-]+(\/[\w.-]+)*)\/model\.json$/i.test(q) && !/\.\./.test(q)) { localStorage.setItem('rr_model', q); return q; }
+    if (q && /^(https:\/\/[^\s"'<>]+|[\w.-]+(\/[\w.-]+)*)\/model\.json$/i.test(q) && !/\.\./.test(q)) {
+      if (new URL(q, location.href).href === DEFAULT_MODEL_URL) { localStorage.removeItem('rr_model'); return DEFAULT_MODEL_URL; }
+      localStorage.setItem('rr_model', q); return q;
+    }
     var saved = localStorage.getItem('rr_model');
+    /* A test link saved earlier that now IS the default is not a test any more. */
+    if (saved && new URL(saved, location.href).href === DEFAULT_MODEL_URL) { localStorage.removeItem('rr_model'); return DEFAULT_MODEL_URL; }
     if (saved) return saved;
   } catch (_) {}
   return DEFAULT_MODEL_URL;
@@ -3186,15 +3204,20 @@ async function loadModel() {
       });
     };
     const testModel = MODEL_URL !== DEFAULT_MODEL_URL;
-    try {
-      tfModel = await loadFrom(MODEL_URL);
-    } catch (e) {
-      if (!testModel) throw e;
-      console.warn('Test model failed, using the standard one:', e.message);
-      try { localStorage.removeItem('rr_model'); } catch (_) {}
-      tfModel = await loadFrom(DEFAULT_MODEL_URL);
-      window._testModelFailed = true;
+    /* Try the chosen model, then the default, then the original - a model that
+       will not load must never leave the app on the weak COCO fallback while a
+       good one is reachable. */
+    const tryList = [MODEL_URL].concat(testModel ? [DEFAULT_MODEL_URL] : [], MODEL_URL === ORIGINAL_MODEL_URL ? [] : [ORIGINAL_MODEL_URL]);
+    let lastErr = null, loadedUrl = null;
+    tfModel = null;
+    for (const u of tryList) {
+      try { tfModel = await loadFrom(u); loadedUrl = u; break; }
+      catch (e) { lastErr = e; console.warn('Model would not load:', u, e.message); }
     }
+    if (!tfModel) throw lastErr || new Error('no model');
+    window._loadedModelUrl = loadedUrl;
+    if (testModel && loadedUrl !== MODEL_URL) { window._testModelFailed = true; try { localStorage.removeItem('rr_model'); } catch (_) {} }
+    window._usingOriginalFallback = loadedUrl === ORIGINAL_MODEL_URL && MODEL_URL !== ORIGINAL_MODEL_URL;
     window._testModel = testModel && !window._testModelFailed;
     /* MODEL_TRUSTS_GROUPS. The pixel "white fraction" override of solid vs
        stripe was written for the original model, which was close to guessing
@@ -3202,11 +3225,12 @@ async function loadModel() {
        from 32% to 56% right, but drags a retrained model from 78% to 58%. Models
        trained with training/train_ball_model.ipynb ship in model-vN folders and
        make that call themselves; the 8-ball and cue-ball checks still run. */
-    window._modelTrustsGroups = /(^|\/)model-v\d+\/model\.json$/i.test(window._testModelFailed ? DEFAULT_MODEL_URL : MODEL_URL);   // also right once a model-vN becomes the default
+    window._modelTrustsGroups = /(^|\/)model-v\d+\/model\.json$/i.test(loadedUrl);   // whichever model actually loaded
 
     modelReady = true;
     setModelStatus(window._testModel ? '🧪 Test model loaded — ' + MODEL_URL.split('/').slice(-2, -1)[0] + ' (open with ?model=default to go back)'
                  : window._testModelFailed ? '⚠️ Test model would not load — using the standard AI'
+                 : window._usingOriginalFallback ? '✅ Curran\'s AI Is Ready — using the original model (the newer one would not load)'
                  : '✅ Curran\'s AI Is Ready —  ✅ All Systems Online', 'ready');
     setStatus('Start Camera or Upload a Photo — Have Fun & Enjoy!', 'live');
     aiBtn.disabled = false;
@@ -3800,6 +3824,8 @@ async function runDetection() {
         setStatus('🤖 AI detected balls — auto-calculating best shot…', 'gold');
         suggestShot();
       }, 600);
+    } else if (hasTarget) {
+      setTimeout(() => { suggestShot(); }, 600);   // the answer box asks for the cue ball, where the player is looking
     }
 
   } catch (err) {
@@ -5075,7 +5101,12 @@ function renderCanvas() {
     var msg = null;
     /* Highest priority: we've asked for the pocket and are waiting on the tap.
        It has to be ON the photo — that's where the finger already is. */
-    if (_awaitingPocket) msg = '\ud83d\udc46 Tap the pocket you\u2019re aiming at';
+    if (aligning) {
+      /* Aligning: the next tap's instruction, on the photo where the finger is. */
+      var _nc = marks.filter(function(m){ return m.type === 'corner'; }).length;
+      if (_nc < 4) msg = '\ud83d\udc46 Tap the ' + (_alignHalf ? HALF_NAMES[_nc] : ['TOP-LEFT','TOP-RIGHT','BOTTOM-RIGHT','BOTTOM-LEFT'][_nc] + ' corner') + ' (' + (_nc + 1) + ' of 4)';
+    }
+    else if (_awaitingPocket) msg = '\ud83d\udc46 Tap the pocket you\u2019re aiming at';
     else if (!_modeChosen) msg = '\u2b06 Next: pick your game in Quick Setup, then \ud83e\udd16 AI Detect';
     else if (!ballMarks) msg = 'Next: tap \ud83e\udd16 AI Detect in the bottom bar';
     /* 9-BALL: the lowest ball isn't extra context, it's the whole game — every
@@ -5091,9 +5122,9 @@ function renderCanvas() {
        skipping it - but never ahead of the pocket or lowest-ball prompts, which
        actually block a result. Shown once per photo, then it stops. */
     else if (ballMarks && !window._tHf && !_alignTipSeen)
-      msg = '\ud83d\udcd0 Tip: Align Table for sharper angles + diamonds \u2014 tap to dismiss';
+      msg = '\ud83d\udcd0 Tip: \ud83d\udcd0 True angles under the read lines the table up \u2014 tap to dismiss';
     if (!msg) return;
-    window._chipIsAlignTip = (msg.indexOf('Align Table for sharper') >= 0);
+    window._chipIsAlignTip = (msg.indexOf('True angles under the read') >= 0);
     ctx.save();
     ctx.font = '600 ' + Math.max(11, Math.round(W*0.019)) + 'px Barlow Condensed, sans-serif';
     var tw = ctx.measureText(msg).width + 26;
@@ -5767,6 +5798,7 @@ function _rankedShots() {
               .sort(function(a,b){ return a._rank - b._rank; });
 }
 var _keepFocus = false;
+var _noScroll = false;     // an automatic re-read after a fix: the player is looking at the photo, so stay put
 function cycleFocusShot(d) {
   var n = _rankedShots().length;
   if (n < 2) return;
@@ -8053,6 +8085,7 @@ function startAlignHalf() {
   startAlign();
   if (!aligning) return;
   _alignHalf = true;
+  renderCanvas();          // redraw so the on-photo instruction names the far-end pocket
   setStatus('Far end: tap the ' + HALF_NAMES[0] + ' (1 of 4) \u2014 left and right as you look at the photo.', 'gold');
 }
 /* Four taps -> the two near corners, extrapolated through the same rectangle.
@@ -9182,8 +9215,9 @@ function suggestShot() {
   }
 
   if (!cue) {
-    titl.textContent='Mark the Cue Ball First';
-    body.textContent='Tap the canvas to place the cue ball marker (C) — the app needs to know where you\'re shooting from before it can read the shot.';
+    _wantCue = true; syncTrueAnglesBtn(false);
+    titl.textContent='Where\u2019s the Cue Ball?';
+    body.textContent='The AI didn\u2019t find the white ball. Tap it on the photo \u2014 the read follows by itself.';
     sug.classList.add('show'); setTimeout(function(){ sug.scrollIntoView({behavior:'smooth', block:'nearest'}); }, 60); return;
   }
 
@@ -9196,10 +9230,10 @@ function suggestShot() {
      would confidently plan a shot at a rail, a wall, or the far side of the room
      and never mention it was guessing. One honest tap fixes it. */
   if (!pkt && !window._tHf) {
-    _awaitingPocket = true;
+    _awaitingPocket = true; syncTrueAnglesBtn(true);
     if (typeof renderCanvas === 'function') renderCanvas();
     titl.textContent = 'Which Pocket?';
-    body.textContent = 'This photo isn\u2019t an aligned full table, so I can\u2019t work out where the pockets are \u2014 and I\u2019d rather ask than guess.\n\nTap the pocket you\u2019re aiming at, right on the photo. That\u2019s all I need: cue ball, object ball, and one pocket.\n\nSingle pocket = quick, but no diamonds. \ud83d\udcd0 Align Table = full geometry and sharper angles.\n\n(For a whole-table photo instead, use \ud83d\udcd0 Align Table or \u2728 Auto in Step 2 and every pocket gets placed for you. Shooting from behind the cue with the near end out of the picture? Tap \ud83d\udcd0 Near end out of the photo? \u2014 four taps line it up and give true angles.)';
+    body.textContent = 'Tap the pocket you\u2019re aiming at, right on the photo.\n\nOr tap \ud83d\udcd0 True angles below: it lines the table up so every angle is exact and every pocket is read.';
     sug.classList.add('show'); setTimeout(function(){ sug.scrollIntoView({behavior:'smooth', block:'nearest'}); }, 60); return;
   }
   _awaitingPocket = false;
@@ -9620,8 +9654,9 @@ function suggestShot() {
   }
   /* Unaligned: every angle above came off the photo itself. On a low camera
      that is 25+ degrees out, so say it once, with the way to fix it. */
+  syncTrueAnglesBtn(true);
   if (!window._tHf && targetBall && cutAngle !== null)
-    verdict += '\n\ud83d\udcd0 Angles are estimated from the photo \u2014 line up the table ' + (simpleMode ? 'under \u2699 Change something' : 'in Step 2') + ' for true ones.';
+    verdict += '\n\ud83d\udcd0 Angles are estimated from the photo \u2014 tap \ud83d\udcd0 True angles below.';
   if (cueNote.indexOf('SCRATCH') !== -1) verdict += '\n\u26a0\ufe0f Scratch risk on a ' + (simpleMode ? 'center-ball hit' : 'stun shot') + ' \u2014 see the full read.';
   if (kickNote)  verdict += '\n\ud83c\udfb1 A kick is drawn in gold on the table.';
   if (comboNote) verdict += '\n\ud83c\udfaf There is a combo option in the full read.';
@@ -9642,7 +9677,7 @@ function suggestShot() {
   if (simpleMode && !_stepsOpen) document.body.classList.add('read-folded');
   sug.classList.add('show');
   // Don't yank the page around when the arrows regenerate the panel.
-  if (!_keepFocus) setTimeout(function(){ sug.scrollIntoView({behavior:'smooth', block:'nearest'}); }, 60);
+  if (!_keepFocus && !_noScroll) setTimeout(function(){ sug.scrollIntoView({behavior:'smooth', block:'nearest'}); }, 60);
 
   // Coaching mode — suppressed in Simple mode even if the toggle was saved on
   var coachBox = document.getElementById('coaching-box');
@@ -9956,6 +9991,7 @@ function handleTap(fx, fy) {
         window._pendingPocketRemove = null;
         renderCanvas(); hideSuggestion();
         setStatus('Pocket removed','gold');
+        autoReread();
       } else {
         window._pendingPocketRemove = m;
         setStatus('Tap this pocket again to remove it — or drag it to move it','gold');
@@ -9997,6 +10033,7 @@ function handleTap(fx, fy) {
       renderCanvas(); hideSuggestion();
       const nm = { obj:'Solid', stripe:'Stripe', eight:'8-ball', cue:'Cue ball' };
       setStatus('Changed to ' + nm[newType] + ' — tap again to cycle (Solid → Stripe → 8 → Cue)', 'gold');
+      autoReread();
       return;
     }
   }
@@ -10011,6 +10048,7 @@ function handleTap(fx, fy) {
     placeMode = hasCue ? 'obj' : 'cue';
   }
   placeMarkAt(placeMode, fx, fy);
+  autoReread();
 }
 
 // Mini-map: zoomed crop centerd on the dragged point, parked in the corner
@@ -10173,6 +10211,7 @@ function endDrag(e) {
       const names={cue:'Cue ball',obj:'Solid ball',eight:'8-ball',stripe:'Stripe ball',pocket:'Pocket'};
       if (d.mark) setStatus((names[d.mark.type]||'Ball')+' moved — '+marks.length+' mark(s)','gold');
     }
+    autoReread();
   } else if (e && e.type === 'pointerup') {
     handleTap(d.startFx, d.startFy);
   }
@@ -10346,6 +10385,40 @@ function saveCurrentShot() {
   renderHistory();
 }
 
+/* ONE BUTTON FOR TRUE ANGLES. Shown under any answer whose angles came off
+   the photo itself. Picks the right tool so the player doesn't have to know
+   there are three: Auto when the whole table is in the picture, otherwise
+   the far-end four taps. */
+function syncTrueAnglesBtn(show) {
+  var b = document.getElementById('sug-true');
+  if (b) b.style.display = (show && sourceImg && !window._tHf) ? '' : 'none';
+}
+function getTrueAngles() {
+  if (!sourceImg) return;
+  _awaitingPocket = false;
+  if (!window._tableOffFrame && !window._tHf) {
+    try { autoAlignTable(); } catch (_) {}
+    if (window._tHf) { setTimeout(function () { suggestShot(); }, 120); return; }
+  }
+  startAlignHalf();
+  try { document.querySelector('.status-strip').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
+}
+/* AUTO RE-READ. Every fix used to wipe the answer and leave the player to
+   find Suggest Best Shot in the bottom bar. Now a fix re-reads on its own -
+   but only when the read can't turn around and ask "which pocket?", because
+   that would make the player's NEXT tap a pocket instead of the ball they
+   meant to place. The one exception is the cue ball the app asked for. */
+var _rereadT = null, _wantCue = false;
+function autoReread() {
+  if (!sourceImg || aligning || _awaitingPocket || (typeof tableMode !== 'undefined' && tableMode)) return;
+  var hasCue = marks.some(function (m) { return m.type === 'cue'; });
+  if (!hasCue) return;
+  var canAnswer = !!window._tHf || marks.some(function (m) { return m.type === 'pocket'; });
+  if (!canAnswer && !_wantCue) return;
+  _wantCue = false;
+  clearTimeout(_rereadT);
+  _rereadT = setTimeout(function () { if (!aligning && !dragCtx) { _noScroll = true; try { suggestShot(); } finally { _noScroll = false; } } }, 300);
+}
 /* SAVE FROM THE ANSWER. Same save as Saved reads; the button says it worked,
    because the status strip is usually scrolled out of view by now. */
 function sugSave() {
