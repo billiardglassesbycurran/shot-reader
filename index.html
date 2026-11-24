@@ -1213,11 +1213,6 @@ body.scan-simple #detections-box { display:none !important; }
 #sug-actions{ clear:both; display:flex; gap:8px; margin:12px 0 0; }
 #sug-actions .btn{ flex:1 1 0; min-width:0; min-height:44px; padding:8px 10px; font-size:14px; font-weight:600;
   background:#0d2430; color:#9fe4ff; border:1px solid #2c4a63; }
-#sug-actions #sug-teach{ background:#1c1530; color:#d6c4ff; border-color:#4b3d7a; }
-#teach-note{ font-size:12.5px; color:var(--text-muted); line-height:1.45; margin:8px 2px 0; }
-#teach-note:empty{ display:none; }
-#teach-note button{ min-height:44px; margin:6px 8px 0 0; padding:6px 14px; border-radius:10px; font-size:13.5px; font-weight:700;
-  background:#1c1530; color:#d6c4ff; border:1px solid #4b3d7a; cursor:pointer; }
 
 #sb-hint{ text-align:center; font-family:'Barlow Condensed',sans-serif; letter-spacing:.5px;
   font-size: clamp(11px,3.1vw,13px); color:var(--gold-lt); opacity:.92; margin-top:7px; flex-shrink:0;
@@ -2365,7 +2360,6 @@ body.hist-mode #history-panel {
   .dl-key { gap: 7px 10px; }
   .dl-key span { flex: 0 0 calc(50% - 5px); justify-content: flex-start; }
 }
-#hist-teach { width:100%; margin:0 0 10px; min-height:48px; border-radius:11px; background:#1c1530; color:#d6c4ff; border:1px solid #4b3d7a; font-weight:700; font-size:14px; cursor:pointer; }
 #hist-save-btn { width:100%; margin:0 0 10px; min-height:48px; border-radius:11px;
   background:#1a2c20; border:1px solid #2f5a3e; color:#8fbfa3;
   font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:14px;
@@ -2399,7 +2393,7 @@ body.hist-mode #history-panel {
       <div class="hdr-emblem">🎱</div>
       <div style="flex:1">
         <div class="hdr-name"><span>Curran&rsquo;s Shot Reader</span></div>
-        <div class="hdr-sub">See the table. Read the shot. <span style="color:var(--gold-dim);opacity:.7">· V11.24.1202</span></div>
+        <div class="hdr-sub">See the table. Read the shot. <span style="color:var(--gold-dim);opacity:.7">· V11.24.1209</span></div>
       </div>
       <div style="flex:1 1 100%;display:flex;gap:6px;justify-content:flex-end;margin-top:7px">
         <button class="help-btn" id="hdr-tour-btn" onclick="showWelcome()" title="Welcome tour"><span style="font-size:14px">👋</span> Tour</button>
@@ -2889,9 +2883,7 @@ body.hist-mode #history-panel {
              empty photo box, so once a read was on screen it could not be saved. -->
         <div id="sug-actions">
           <button type="button" class="btn" id="sug-save" onclick="sugSave()">&#128190; Save this read</button>
-          <button type="button" class="btn adv-only" id="sug-teach" onclick="teachSave()">&#129504; Save for AI training</button>
         </div>
-        <div id="teach-note" class="adv-only"></div>
       </div>
       <button type="button" class="btn" id="unfold-btn" onclick="unfoldSteps()">&#9881; Change something &mdash; the table, the balls or the game</button>
     </div><!-- /table-stage -->
@@ -3948,10 +3940,6 @@ function syncScanChrome() {
   b.classList.toggle('cam-on', typeof cameraOn !== 'undefined' && !!cameraOn);
   b.classList.toggle('scan-simple', !!simpleMode);
   if (!sourceImg || !simpleMode || _stepsOpen || !window._shotRead) b.classList.remove('read-folded');
-  /* The training note under the answer: refreshed once per photo, Advanced only. */
-  if (!simpleMode && sourceImg && window._teachShownFor !== sourceImg && typeof teachRefresh === 'function') {
-    window._teachShownFor = sourceImg; try { teachRefresh(); } catch (_) {}
-  }
 }
 function unfoldSteps() {
   _stepsOpen = true; document.body.classList.remove('read-folded');
@@ -10217,129 +10205,6 @@ function sugSave() {
   }
 }
 
-/* ═══ AI TRAINING PHOTOS ═══
-   The detector only gets better from photos of real tables with the RIGHT
-   answer on them. After a read, the player fixes any wrong ball (tap to change
-   its type, drag to move it) and saves: the clean photo and the corrected
-   balls go into this phone's storage in YOLO format. "Download" packs them
-   into one zip the Colab notebook (train_ball_model.ipynb) reads as-is.
-   Nothing is uploaded anywhere. Class ids must match CLASSES. */
-var TEACH_CLS = { cue: 0, obj: 1, stripe: 2, eight: 3 };
-var _teachDB = null;
-function teachDB() {
-  if (_teachDB) return _teachDB;
-  _teachDB = new Promise(function(res, rej){
-    try {
-      var rq = indexedDB.open('curran-train', 1);
-      rq.onupgradeneeded = function(){ rq.result.createObjectStore('photos', { keyPath: 't' }); };
-      rq.onsuccess = function(){ res(rq.result); };
-      rq.onerror = function(){ rej(rq.error); };
-    } catch (e) { rej(e); }
-  });
-  _teachDB.catch(function(){ _teachDB = null; });
-  return _teachDB;
-}
-function teachStore(mode, fn) {
-  return teachDB().then(function(db){ return new Promise(function(res, rej){
-    var tx = db.transaction('photos', mode), st = tx.objectStore('photos'), out;
-    var rq = fn(st); if (rq) rq.onsuccess = function(){ out = rq.result; };
-    tx.oncomplete = function(){ res(out); }; tx.onerror = function(){ rej(tx.error); };
-  }); });
-}
-function teachCount() { return teachStore('readonly', function(st){ return st.count(); }); }
-/* One YOLO line per ball: class cx cy w h, all fractions of the photo. A ball
-   the AI found keeps its box; one the player added gets the median AI box, or
-   a typical ball size when there is none. */
-function teachLabels() {
-  var balls = marks.filter(function(m){ return TEACH_CLS[m.type] !== undefined; });
-  var ws = balls.filter(function(m){ return m._bw > 0; }).map(function(m){ return m._bw; }).sort(function(a, b){ return a - b; });
-  var hs = balls.filter(function(m){ return m._bh > 0; }).map(function(m){ return m._bh; }).sort(function(a, b){ return a - b; });
-  var W = sourceImg.width, H = sourceImg.height, s = 0.035 * Math.min(W, H);
-  var mw = ws.length ? ws[ws.length >> 1] : s / W, mh = hs.length ? hs[hs.length >> 1] : s / H;
-  var cl = function(v){ return Math.max(0, Math.min(1, v)).toFixed(6); };
-  return balls.map(function(m){
-    return TEACH_CLS[m.type] + ' ' + cl(m.fx) + ' ' + cl(m.fy) + ' ' + cl(m._bw > 0 ? m._bw : mw) + ' ' + cl(m._bh > 0 ? m._bh : mh);
-  }).join('\n');
-}
-function teachSave() {
-  if (!sourceImg || _sampleMode) { setStatus('Load a photo of a real table first', 'warn'); return; }
-  var labels = teachLabels();
-  if (!labels) { setStatus('Mark the balls first, then save for training', 'warn'); return; }
-  if (!sourceImg._teachKey) sourceImg._teachKey = Date.now();   // re-saving the same photo updates it
-  var W = sourceImg.width, H = sourceImg.height, k = Math.min(1, 1280 / Math.max(W, H));
-  var c = document.createElement('canvas'); c.width = Math.round(W * k); c.height = Math.round(H * k);
-  c.getContext('2d').drawImage(sourceImg, 0, 0, c.width, c.height);
-  var key = sourceImg._teachKey;
-  c.toBlob(function(blob){
-    if (!blob) { setStatus('Could not save this photo', 'err'); return; }
-    teachStore('readwrite', function(st){ return st.put({ t: key, jpg: blob, txt: labels }); })
-      .then(teachRefresh, function(){ setStatus('This browser would not store the photo', 'err'); });
-  }, 'image/jpeg', 0.9);
-}
-function teachRefresh() {
-  var note = document.getElementById('teach-note');
-  return teachCount().then(function(n){
-    var saved = sourceImg && sourceImg._teachKey;
-    if (note) note.innerHTML = (saved ? '<b style="color:#d6c4ff">&#10003; Saved.</b> ' : 'Fix any wrong ball first &mdash; tap it to change its type. ')
-      + (n ? n + ' training photo' + (n === 1 ? '' : 's') + ' on this phone.<br><button type="button" onclick="teachDownload()">&#11015; Download all</button>'
-           + '<button type="button" onclick="teachClear()">Clear</button>' : '');
-    var hb = document.getElementById('hist-teach'); if (hb) hb.textContent = n ? '🧠 ' + n + ' AI training photo' + (n === 1 ? '' : 's') + ' — download' : '';
-    if (hb) hb.style.display = n ? '' : 'none';
-    return n;
-  }, function(){ if (note) note.textContent = ''; });
-}
-function teachClear() {
-  if (!confirm('Delete every AI training photo saved on this phone? Download them first if you want to keep them.')) return;
-  teachStore('readwrite', function(st){ return st.clear(); }).then(function(){ if (sourceImg) sourceImg._teachKey = null; teachRefresh(); });
-}
-/* A plain stored zip (no compression - the photos are JPEGs already). */
-var _crcT = null;
-function crc32(u8) {
-  if (!_crcT) { _crcT = new Uint32Array(256); for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; _crcT[n] = c >>> 0; } }
-  var x = 0xFFFFFFFF; for (var i = 0; i < u8.length; i++) x = _crcT[(x ^ u8[i]) & 255] ^ (x >>> 8);
-  return (x ^ 0xFFFFFFFF) >>> 0;
-}
-function makeZip(files) {
-  var enc = new TextEncoder(), parts = [], central = [], off = 0;
-  files.forEach(function(f){
-    var name = enc.encode(f.name), d = f.data, crc = crc32(d);
-    var h = new DataView(new ArrayBuffer(30));
-    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint32(14, crc, true);
-    h.setUint32(18, d.length, true); h.setUint32(22, d.length, true); h.setUint16(26, name.length, true);
-    parts.push(new Uint8Array(h.buffer), name, d);
-    var cd = new DataView(new ArrayBuffer(46));
-    cd.setUint32(0, 0x02014b50, true); cd.setUint16(4, 20, true); cd.setUint16(6, 20, true); cd.setUint32(16, crc, true);
-    cd.setUint32(20, d.length, true); cd.setUint32(24, d.length, true); cd.setUint16(28, name.length, true); cd.setUint32(42, off, true);
-    central.push(new Uint8Array(cd.buffer), name);
-    off += 30 + name.length + d.length;
-  });
-  var csize = central.reduce(function(a, p){ return a + p.length; }, 0);
-  var e = new DataView(new ArrayBuffer(22));
-  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true);
-  e.setUint32(12, csize, true); e.setUint32(16, off, true);
-  return new Blob(parts.concat(central, [new Uint8Array(e.buffer)]), { type: 'application/zip' });
-}
-function teachDownload() {
-  return teachStore('readonly', function(st){ return st.getAll(); }).then(function(rows){
-    if (!rows || !rows.length) { setStatus('No training photos saved yet', 'warn'); return; }
-    return Promise.all(rows.map(function(r){ return r.jpg.arrayBuffer(); })).then(function(bufs){
-      var enc = new TextEncoder(), files = [];
-      rows.forEach(function(r, i){
-        var id = 'curran_' + r.t;
-        files.push({ name: 'images/' + id + '.jpg', data: new Uint8Array(bufs[i]) });
-        files.push({ name: 'labels/' + id + '.txt', data: enc.encode(r.txt + '\n') });
-      });
-      files.push({ name: 'data.yaml', data: enc.encode('# Curran\'s Shot Reader training photos\nnc: 4\nnames: [cue-ball, solid, stripe, eight-ball]\n') });
-      var zip = makeZip(files), a = document.createElement('a');
-      a.href = URL.createObjectURL(zip); a.download = 'curran-training-' + rows.length + '-photos.zip';
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(function(){ URL.revokeObjectURL(a.href); }, 60000);
-      setStatus('Downloaded ' + rows.length + ' training photo' + (rows.length === 1 ? '' : 's'), 'live');
-      return rows.length;
-    });
-  }, function(){ setStatus('This browser would not open the training photos', 'err'); });
-}
-
 function timeAgo(ts) {
   var m = Math.floor((Date.now() - ts) / 60000);
   if (m < 1) return 'just now';
@@ -10380,11 +10245,6 @@ function renderHistory() {
     save.onclick = function(){ saveCurrentShot(); };
     box.appendChild(save);
   }
-  var tb = document.createElement('button');
-  tb.id = 'hist-teach'; tb.style.display = 'none';
-  tb.onclick = function(){ teachDownload(); };
-  box.appendChild(tb);
-  try { teachRefresh(); } catch (_) {}
 
   if (!shotHistory.length) {
     var e = document.createElement('div');
@@ -13349,10 +13209,6 @@ try {
           <div><div class="help-item-title">Which one should I use?</div><div class="help-item-desc"><strong>Table Mode is the one to use while you are actually playing.</strong> Stand the phone up <strong>sideways (landscape)</strong> where it can see the whole table — that is the shape of a pool table, so it fills the screen with nothing cropped and nothing to scroll. Then leave it alone — it watches, waits for the balls to stop rolling, reads the shot and says it out loud. You never touch the phone between shots, which matters when it is your turn and you are holding a cue.<br><br><strong>Scan &amp; Read the Shot</strong> is the one-at-a-time version: take a photo, line the table up, check the balls, get an answer. Better for studying a layout after the fact, showing someone a shot, or reading a photo you already took — but you have to drive it by hand each time.</div></div>
           <div><div class="help-item-title">What Table Mode hides</div><div class="help-item-desc">Table Mode is built to be read from across the room, so it puts away everything you don&rsquo;t need mid-rack — the setup panel, the picture area and the buttons at the bottom. <strong>Tour</strong> and <strong>Guide</strong> step away too, since they describe the setup flow. <strong>📜 Rules</strong> stays, because the game&rsquo;s rules matter whatever screen you are on.</div></div>
           <div><div class="help-item-title">Try a Sample Shot</div><div class="help-item-desc">No table around? In <strong>Scan &amp; Read the Shot</strong>, tap <strong>&#127891; Try a sample shot</strong> &mdash; a practice layout loads on a drawn table and the full analysis runs on it: crown, ghost ring, contact key, difficulty. Great for showing a friend what the app does. Load any real photo to leave sample mode.</div></div>
-        </div>
-        <div class="help-item">
-          <div class="help-icon">&#129504;</div>
-          <div><div class="help-item-title">Help Train the AI</div><div class="help-item-desc">The AI gets better from photos of real tables with the right answer on them. In <strong>ADV</strong>, after a read, fix any ball it got wrong &mdash; tap it to change solid, stripe, cue or 8, drag it to move it &mdash; then tap <strong>&#129504; Save for AI training</strong>. The photo and the corrected balls stay <strong>on this phone</strong>. <strong>&#11015; Download all</strong> packs them into one zip, ready for the training notebook. Nothing is uploaded anywhere.</div></div>
         </div>
         <div class="help-item">
           <div class="help-icon">🚶</div>
