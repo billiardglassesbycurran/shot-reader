@@ -2399,7 +2399,7 @@ body.hist-mode #history-panel {
       <div class="hdr-emblem">🎱</div>
       <div style="flex:1">
         <div class="hdr-name"><span>Curran&rsquo;s Shot Reader</span></div>
-        <div class="hdr-sub">See the table. Read the shot. <span style="color:var(--gold-dim);opacity:.7">· V11.24.0535</span></div>
+        <div class="hdr-sub">See the table. Read the shot. <span style="color:var(--gold-dim);opacity:.7">· V11.24.1202</span></div>
       </div>
       <div style="flex:1 1 100%;display:flex;gap:6px;justify-content:flex-end;margin-top:7px">
         <button class="help-btn" id="hdr-tour-btn" onclick="showWelcome()" title="Welcome tour"><span style="font-size:14px">👋</span> Tour</button>
@@ -3203,6 +3203,13 @@ async function loadModel() {
       window._testModelFailed = true;
     }
     window._testModel = testModel && !window._testModelFailed;
+    /* MODEL_TRUSTS_GROUPS. The pixel "white fraction" override of solid vs
+       stripe was written for the original model, which was close to guessing
+       there. Measured on 183 held-out photos (Nov 2026): it lifts the original
+       from 32% to 56% right, but drags a retrained model from 78% to 58%. Models
+       trained with training/train_ball_model.ipynb ship in model-vN folders and
+       make that call themselves; the 8-ball and cue-ball checks still run. */
+    window._modelTrustsGroups = /(^|\/)model-v\d+\/model\.json$/i.test(window._testModelFailed ? DEFAULT_MODEL_URL : MODEL_URL);   // also right once a model-vN becomes the default
 
     modelReady = true;
     setModelStatus(window._testModel ? '🧪 Test model loaded — ' + MODEL_URL.split('/').slice(-2, -1)[0] + ' (open with ?model=default to go back)'
@@ -3567,7 +3574,11 @@ async function runDetection() {
       // because losing the cue mark breaks shot suggestion entirely.
       const ballTypes = new Set(['obj', 'stripe', 'eight']);
       const aiBalls = marks.filter(m => m.aiDetected && ballTypes.has(m.type));
-      if (aiBalls.length) {
+      /* Not for a retrained model (MODEL_TRUSTS_GROUPS): measured on 165 real
+         table frames, the darkness rules turned its 97%-right 8-ball calls into
+         6% - on a small ball the white number disc and the cloth lift the
+         measured darkness, and "active rejection" demotes the real 8. */
+      if (aiBalls.length && !window._modelTrustsGroups) {
         const sorted = aiBalls.slice().sort((a, b) => a._luma - b._luma);
         const darkest  = sorted[0];
         const runnerUp = sorted[1] || null;
@@ -3746,6 +3757,7 @@ async function runDetection() {
       var SOLID_BELOW   = 0.15;    // measured solids: 0.00-0.08
       var STRIPE_ABOVE  = 0.45;    // measured stripe reference: ~0.41-0.50
       marks.forEach(function(m){
+        if (window._modelTrustsGroups) return;                 // a retrained model calls this itself - see MODEL_TRUSTS_GROUPS
         if (!m.aiDetected) return;
         if (m.type !== 'obj' && m.type !== 'stripe') return;   // never cue or 8
         if (typeof m._bw !== 'number') return;

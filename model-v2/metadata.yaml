@@ -1,0 +1,26 @@
+description: Curran's Shot Reader model-v2 - YOLOv8n, nhantu2107/pool-detection (MIT) mapped to cue-ball/solid/stripe/eight-ball
+author: Ultralytics
+date: '2026-11-24T11:11:51.122302'
+version: 8.4.66
+license: AGPL-3.0 License (https://ultralytics.com/license)
+docs: https://docs.ultralytics.com
+stride: 32
+task: detect
+batch: 1
+imgsz:
+- 640
+- 640
+names:
+  0: cue-ball
+  1: solid
+  2: stripe
+  3: eight-ball
+args:
+  data: null
+  batch: 1
+  fraction: 1.0
+  half: false
+  int8: false
+  nms: false
+channels: 3
+end2end: false
