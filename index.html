@@ -2400,7 +2400,7 @@ body.hist-mode #history-panel {
       <div class="hdr-emblem">🎱</div>
       <div style="flex:1">
         <div class="hdr-name"><span>Curran&rsquo;s Shot Reader</span></div>
-        <div class="hdr-sub">See the table. Read the shot. <span style="color:var(--gold-dim);opacity:.7">· V11.24.0545</span></div>
+        <div class="hdr-sub">See the table. Read the shot. <span style="color:var(--gold-dim);opacity:.7">· V11.25.0533</span></div>
       </div>
       <div style="flex:1 1 100%;display:flex;gap:6px;justify-content:flex-end;margin-top:7px">
         <button class="help-btn" id="hdr-tour-btn" onclick="showWelcome()" title="Welcome tour"><span style="font-size:14px">👋</span> Tour</button>
@@ -6304,6 +6304,13 @@ function dlBankShots() {
       if (cosCut < 0.17) continue;                   // past ~80 deg it is not a shot
       var cut = Math.round(Math.acos(Math.max(-1, Math.min(1, cosCut))) * 180 / Math.PI);
 
+      /* A cushion to bank off, and nowhere else to drop. Kicks already
+         checked both; banks did not - 225 of 2,933 banks shown in random
+         layouts hit a pocket mouth (no cushion there) or would have dropped
+         the ball in a different pocket on the way. */
+      if (dlRailNumber(rails[ri], hit).pocket) continue;
+      if (dlCrossesPocket(_dlObj, hit)) continue;
+      var _via = dlCrossesPocket(hit, pk); if (_via && _via !== pk) continue;
       /* Both legs clear, and the cue's path to the ghost clear. */
       if (dlSegBlocked(_dlObj, hit, null)) continue;
       if (dlSegBlocked(hit, pk, null)) continue;
@@ -6367,7 +6374,9 @@ function dlC5CalWord() {
 
 /* ── WHERE DOES THE OBJECT BALL GO? ───────────────────────────────
    The kick aims at the object ball's centre, so it is a full hit and the
-   object ball leaves along the same line the cue ball arrived on. March that
+   object ball leaves along the same line the cue ball arrived on - the LAST
+   leg, from the last cushion. (It was given the first cushion, so on a two-
+   or three-cushion kick it sent the red the wrong way and could say "IN".) March that
    ray to the first cushion and see whether it passes through a pocket mouth
    on the way - that is the difference between a safety and a made ball. */
 
@@ -6524,12 +6533,24 @@ function dlKickPath(rails, target) {
 
   // legs, in order, ending at the object ball
   var pts = [_dlCue].concat(hits, [target]);
-  var len = 0, blocked = false, scratch = null;
+  var len = 0, blocked = false, scratch = null, objFirst = false;
   for (i = 0; i < pts.length - 1; i++) {
     len += Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y);
     if (dlSegBlocked(pts[i], pts[i + 1])) blocked = true;
     if (!scratch) scratch = dlCrossesPocket(pts[i], pts[i + 1]);
+    /* THE BALL TO HIT IS AN OBSTACLE TOO, until the moment it is meant to be
+       hit. dlSegBlocked only sees the blockers, so a route could run the cue
+       ball straight through the red on its way to the cushion (seen on a
+       phone: "1 cushion, aim 1.4" through the middle of the ball). Every leg
+       before the last must pass a full ball-width clear; the last may only
+       touch it where it ends. */
+    var a = pts[i], c = pts[i + 1], vx = c.x - a.x, vy = c.y - a.y, L2 = vx * vx + vy * vy;
+    var tt = L2 ? ((_dlObj.x - a.x) * vx + (_dlObj.y - a.y) * vy) / L2 : 0, tc = tt < 0 ? 0 : (tt > 1 ? 1 : tt);
+    var dd = Math.hypot(a.x + tc * vx - _dlObj.x, a.y + tc * vy - _dlObj.y);
+    if (i < pts.length - 2) { if (dd < DL_RR * 2) objFirst = true; }
+    else if (target !== _dlObj && tt < 1 - 1e-6 && dd < DL_RR * 2 * 0.995) objFirst = true;
   }
+  if (objFirst) blocked = true;
 
   /* Can a cue be got on it? Only the FIRST cushion matters - after that the
      cue ball is already travelling. */
@@ -6552,19 +6573,23 @@ function dlKickPath(rails, target) {
      toward the pocket side, or there is no cut that sends the ball in. Past
      about 80 degrees it is not a shot. The object ball's own path to the
      pocket must be clear as well. */
-  var cut = null, cutBad = false, objBlocked = false;
+  var cut = null, cutBad = false, objBlocked = false, objDrop = null;
   if (target !== _dlObj && target.ux !== undefined) {
     var last = pts[pts.length - 2], ex = target.x - last.x, ey = target.y - last.y, eL = Math.hypot(ex, ey) || 1;
     var cs = (ex * target.ux + ey * target.uy) / eL;
     cut = Math.round(Math.acos(Math.max(-1, Math.min(1, cs))) * 180 / Math.PI);
     cutBad = cs < 0.17;
     objBlocked = dlSegBlocked(_dlObj, target.pocket);
+    /* A red running along the rail into a corner passes over the side pocket
+       on the way - and can drop there first (0.6% of clean pot routes). */
+    var _via = dlCrossesPocket(_dlObj, target.pocket);
+    if (_via && _via !== target.pocket) { objDrop = _via; objBlocked = true; }
   }
   return { rails: rails.slice(), hits: hits, pts: pts, n: nums[0], nums: nums,
            cushions: n, pocket: pocket, blocked: blocked, scratch: scratch,
            tight: tight, gap: gap, leg1: leg1, len: len,
            rail: rails[0], hit: hits[0], key: rails.join('-'),
-           cut: cut, cutBad: cutBad, objBlocked: objBlocked };
+           cut: cut, cutBad: cutBad, objBlocked: objBlocked, objFirst: objFirst, objDrop: objDrop };
 }
 
 var DL_RAILS = ['top', 'bottom', 'left', 'right'];
@@ -6971,7 +6996,7 @@ function dlSvg() {
            '" stroke="' + oc2 + '" stroke-width="1.8" stroke-dasharray="3 4" stroke-linecap="round"/>');
     if (!best.objBlocked) txt(gh.pocket.x, gh.pocket.y + (gh.pocket.y < 100 ? 22 : -14), 'IN', '#2dff8a', 700, 10);
   } else if (best && !best.blocked) {
-    var op = dlObjectPath(best.hit);
+    var op = dlObjectPath(best.pts[best.pts.length - 2]);   // the leg that arrives at the ball, not the first
     if (op) {
       var oc = op.blocked ? '#c46a4a' : (op.potted ? '#2dff8a' : '#e7ddc7');
       p.push('<line x1="' + _dlObj.x + '" y1="' + _dlObj.y + '" x2="' + op.end.x + '" y2="' + op.end.y +
@@ -7129,11 +7154,13 @@ function dlRender() {
                        : '') +
                      (gh
                        ? (best.objBlocked
-                           ? '<div class="dl-pocket">Another ball sits on the red&rsquo;s line to ' + gh.pocket.name + '.</div>'
+                           ? (best.objDrop
+                               ? '<div class="dl-pocket">The red would run over ' + best.objDrop.name + ' on its way to ' + gh.pocket.name + ' and can drop there first.</div>'
+                               : '<div class="dl-pocket">Another ball sits on the red&rsquo;s line to ' + gh.pocket.name + '.</div>')
                            : '<div class="dl-made">\u2713 The red goes in <span style="font-weight:700;color:#dcffe9">' + gh.pocket.name + '</span> \u2014 a ' + best.cut + '\u00b0 cut off the kick.</div>')
                        : '') +
                      (gh ? '' : (function () {
-                        var o = dlObjectPath(best.hit);
+                        var o = dlObjectPath(best.pts[best.pts.length - 2]);
                         if (!o) return '';
                         if (o.blocked) return '<div class="dl-pocket">The object ball would hit another ball on its way out.</div>';
                         if (o.potted)  return '<div class="dl-made">\u2713 The object ball runs to <b>' + o.potted.name + '</b>.</div>';
@@ -7180,7 +7207,7 @@ function dlRender() {
       li.push('<b>Careful:</b> that line takes the cue ball over ' + best.scratch.name +
               ' on the way \u2014 it would drop in. The geometry is right, the shot is a foul.');
     }
-    var op2 = gh ? null : dlObjectPath(best.hit);
+    var op2 = gh ? null : dlObjectPath(best.pts[best.pts.length - 2]);
     if (gh && !best.objBlocked) li.push('<b>It goes.</b> The red runs to ' + gh.pocket.name + ' \u2014 the green dotted line.');
     if (op2) {
       li.push(op2.blocked
@@ -8852,11 +8879,18 @@ function computeKickShot(cueRaw, targetRaw, allBalls) {
   var M = 0.06;                                   // corner margin (canonical)
   var R = BALL_R();
 
+  /* A ball's CENTRE turns one radius in front of the cushion, not on it.
+     Mirroring across the cushion itself put the bounce a radius off: played
+     as drawn, the cue ball arrived ~0.6 of a ball-width off centre - a thin
+     glancing hit, not the full hit drawn (3,000 random layouts); now 0.
+     The diamond lesson already used the radius-in line; now this does too.
+     Unaligned photo space has no reliable ball size and keeps the edge. */
+  var inset = window._tHinv ? R : 0;
   var rails = [
-    { name:'bottom', axis:'y', v:0    },
-    { name:'top',    axis:'y', v:maxY },
-    { name:'left',   axis:'x', v:0    },
-    { name:'right',  axis:'x', v:maxX }
+    { name:'bottom', axis:'y', v:inset        },
+    { name:'top',    axis:'y', v:maxY - inset },
+    { name:'left',   axis:'x', v:inset        },
+    { name:'right',  axis:'x', v:maxX - inset }
   ];
 
   var best = null;
@@ -8881,9 +8915,10 @@ function computeKickShot(cueRaw, targetRaw, allBalls) {
        rail win. Half the pocket mouth plus a ball radius. */
     if (r.axis === 'y' && Math.abs(bx - maxX/2) < (0.025 + R)) continue;
 
-    // Both legs (cue→bounce, bounce→target) must be clear of other balls.
+    // Both legs (cue→bounce, bounce→target) must be clear of other balls -
+    // and on the way TO the cushion the target itself is in the way too.
     var bounce = {fx:bx, fy:by};
-    if (kickLegBlocked(cue, bounce, tgt, allBalls, R)) continue;
+    if (kickLegBlocked(cue, bounce, null, allBalls, R)) continue;
     if (kickLegBlocked(bounce, tgt, cue, allBalls, R)) continue;
 
     // Prefer the shortest total path (simplest kick).
@@ -8911,7 +8946,10 @@ function kickLegBlocked(a, b, exclude, allBalls, R) {
       var along=(o.fx-a.fx)*(b.fx-a.fx)+(o.fy-a.fy)*(b.fy-a.fy);
       var seg2=(b.fx-a.fx)*(b.fx-a.fx)+(b.fy-a.fy)*(b.fy-a.fy);
       var tt = seg2>0?along/seg2:-1;
-      if (tt>0.05 && tt<0.95) return true;
+      /* The whole leg counts. The ends used to be skipped (0.05-0.95), so a
+         ball beside the cushion contact or just short of the target was
+         ignored; the shooter and target are already excluded above. */
+      if (tt>0.02 && tt<1) return true;
     }
   }
   return false;
@@ -9050,37 +9088,56 @@ function findComboShot(cue, targets, pockets, obstacles) {
   /* Same rule as findBestShot: candidates and obstructions are different
      questions. A ball in the lane blocks the combo whoever owns it. */
   const lane = (obstacles && obstacles.length) ? obstacles : targets;
-  const twoR = LEGACY_BALL_RADIUS * 2;   // combo ghost math is photo-space
-  for (const B of targets) {                 // ball we want to pocket
-    for (const P of pockets) {
-      const bpx = P.fx - B.fx, bpy = P.fy - B.fy;
-      const bpLen = Math.hypot(bpx, bpy);
-      if (bpLen < 0.02) continue;            // B already basically in the pocket
-      const dBPx = bpx/bpLen, dBPy = bpy/bpLen;
-      // B -> P lane must be clear (cue counts as a blocker; ignore B itself)
-      if (!comboLaneClear(B.fx, B.fy, P.fx, P.fy, lane.concat([cue]), [B])) continue;
-      // ghost point A must reach to drive B toward P
-      const gAx = B.fx - dBPx*twoR, gAy = B.fy - dBPy*twoR;
-      for (const A of targets) {             // ball the cue strikes first
-        if (A === B) continue;
-        const aInx = gAx - A.fx, aIny = gAy - A.fy;   // direction A must travel
-        if (Math.hypot(aInx, aIny) < 0.001) continue;
-        // cut angle at the A->B collision (A approach vs B departure)
+  /* ON THE TABLE, NOT THE PHOTO. This used to run in raw photo space even on
+     an aligned table, so perspective bent every angle: in 3,000 random
+     layouts on a tilted table, 2 of 9 combos offered were impossible (a real
+     cut over 80 degrees) and reported cuts were up to 63 degrees out. Aligned
+     now works in table space at the true ball size, and the cue ball aims
+     at ball A's GHOST spot, not its centre - the same rule as every other
+     shot. Unaligned keeps photo space and the tuned radius. */
+  const aligned = !!window._tHinv;
+  const at = m => aligned ? geoP(m) : m;
+  const twoR = aligned ? 2 * BALL_R() : LEGACY_BALL_RADIUS * 2;
+  const laneAll = lane.concat([cue]);
+  const clear = (a, b, ignore) => {
+    for (const o of laneAll) {
+      if (ignore.indexOf(o) !== -1) continue;
+      const q = at(o);
+      if (pointToSegmentDist(q, a, b) < twoR) {
+        const vx = b.fx - a.fx, vy = b.fy - a.fy, L2 = vx * vx + vy * vy;
+        const t = L2 > 0 ? ((q.fx - a.fx) * vx + (q.fy - a.fy) * vy) / L2 : -1;
+        if (t > 0.02 && t < 1.0) return false;
+      }
+    }
+    return true;
+  };
+  const C = at(cue);
+  for (const Bm of targets) {                // ball we want to pocket
+    const B = at(Bm);
+    for (const Pm of pockets) {
+      const P = at(Pm);
+      const bpx = P.fx - B.fx, bpy = P.fy - B.fy, bpLen = Math.hypot(bpx, bpy);
+      if (bpLen < 0.02) continue;
+      const dBPx = bpx / bpLen, dBPy = bpy / bpLen;
+      if (!clear(B, P, [Bm])) continue;      // B -> pocket
+      const gA = { fx: B.fx - dBPx * twoR, fy: B.fy - dBPy * twoR };   // where A must arrive
+      for (const Am of targets) {            // ball the cue strikes first
+        if (Am === Bm) continue;
+        const A = at(Am);
+        const aInx = gA.fx - A.fx, aIny = gA.fy - A.fy, aLen = Math.hypot(aInx, aIny);
+        if (aLen < 0.001) continue;
         const cutAB = angleBetweenVec(aInx, aIny, dBPx, dBPy);
-        if (cutAB === null || cutAB > 55) continue;   // too thin to reliably drive B
-        // A -> B lane clear (ignore A and B)
-        if (!comboLaneClear(A.fx, A.fy, B.fx, B.fy, lane.concat([cue]), [A, B])) continue;
-        // cue must send A toward the ghost point -> cut angle at A
-        const cueInx = A.fx - cue.fx, cueIny = A.fy - cue.fy;
-        const cutCueA = angleBetweenVec(cueInx, cueIny, aInx, aIny);
+        if (cutAB === null || cutAB > 55) continue;            // too thin to drive B
+        if (!clear(A, gA, [Am, Bm])) continue;                 // A -> B
+        const gC = { fx: A.fx - aInx / aLen * twoR, fy: A.fy - aIny / aLen * twoR };   // where the cue must arrive
+        const cutCueA = angleBetweenVec(gC.fx - C.fx, gC.fy - C.fy, aInx, aIny);
         if (cutCueA === null || cutCueA > 65) continue;
-        // cue -> A lane clear (ignore A; B blocking this path kills the combo)
-        if (!comboLaneClear(cue.fx, cue.fy, A.fx, A.fy, lane, [A])) continue;
-        const dCueA = Math.hypot(cueInx, cueIny), dAB = dist(A, B), dBP = bpLen;
-        // Combos are inherently tough: two collisions compound aiming error.
+        if (!clear(C, gC, [Am, cue])) continue;                 // cue -> A (B in the way kills it)
+        const dCueA = Math.hypot(gC.fx - C.fx, gC.fy - C.fy), dAB = aLen, dBP = bpLen;
         let diff = 4 + cutAB/25 + cutCueA/45 + (dCueA + dAB + dBP)*1.4;
         diff = Math.max(1, Math.min(10, Math.round(diff)));
-        const cand = { ballA:A, ballB:B, pocket:P, ghostA:{fx:gAx, fy:gAy},
+        const ghostRaw = aligned ? (canonToRaw(gA) || { fx: Bm.fx, fy: Bm.fy }) : gA;
+        const cand = { ballA:Am, ballB:Bm, pocket:Pm, ghostA:ghostRaw,
                        cutAB:Math.round(cutAB), cutCueA:Math.round(cutCueA), difficulty:diff };
         if (!best || cand.difficulty < best.difficulty ||
            (cand.difficulty === best.difficulty && cand.cutAB < best.cutAB)) best = cand;
@@ -9105,7 +9162,12 @@ function contactKeyInfo(cue, ball, pocket) {
   if (al < 1e-6 || pl < 1e-6) return { line:4, side:'center', off:0, cut:0, label:'center — full hit' };
   const anx=ax/al, any=ay/al, pnx=px/pl, pny=py/pl;
   let dot = anx*pnx + any*pny; dot = Math.max(-1, Math.min(1, dot));
-  const cut = Math.acos(dot) * 180/Math.PI;
+  /* ONE cut angle. This used to measure its own, cue to the ball's centre,
+     while the ranker measures to the ghost spot: the two put the key in a
+     different band on 13% of shots. Take the ranker's; the centre version
+     stays only as a fallback. */
+  const _rc = (rawCue && rawBall && rawPkt) ? computeCutAngle(rawCue, rawBall, rawPkt) : null;
+  const cut = (_rc !== null) ? _rc : Math.acos(dot) * 180/Math.PI;
   /* >0 → hit LEFT side, <0 → hit RIGHT side. Taken from the PHOTO, not the
      canonical table: canonical space is a mirror image of the real table
      whenever the corners were tapped anticlockwise, and a mirror swaps left
@@ -9302,7 +9364,7 @@ function suggestShot() {
         var _ckn = document.getElementById('contact-key-note');
         if (_ckn) {
           _ckn.textContent = top.blocked
-            ? 'No contact point — the direct path is blocked. See the kick or combo option below.'
+            ? 'No contact point — the direct path is blocked.'
             : 'No contact point — mark a target pocket to see where to strike.';
           _ckn.style.display = 'block';
         }
@@ -9605,6 +9667,8 @@ function suggestShot() {
   var englishAdvice = getEnglishAdvice(cutAngle);
   if (englishAdvice && englishAdvice.trim()) englishAdvice = '\n\u2022 SPIN \u2014 ' + englishAdvice.trim();
   var plainHeadline = '';
+  /* Only point at escapes that are actually on offer below. */
+  var _esc = (kickNote || comboNote) ? 'Use the kick or combo option below, or play safe.' : 'Play safe.';
   /* An extreme cut overrides the difficulty number - at 75+ degrees the
      direct shot is barely real and at 85+ it is not one, so no phrasing of
      "commit" is honest. Route the player to the escapes instead. */
@@ -9613,13 +9677,13 @@ function suggestShot() {
      that is the reason there is no shot, even if a ball also happens to sit
      in some lane. It used to say "blocked" with nothing in the way. */
   if (cutAngle !== null && cutAngle >= 90)
-    plainHeadline = '\ud83d\uded1 No ball has an angle into this pocket from here \u2014 the cue ball can\u2019t reach the side of a ball that would send it there. Use the kick or combo options below, or play safe.\n\n';
+    plainHeadline = '\ud83d\uded1 No ball has an angle into this pocket from here \u2014 the cue ball can\u2019t reach the side of a ball that would send it there. ' + _esc + '\n\n';
   else if (cutAngle !== null && cutAngle >= 85)
-    plainHeadline = '\ud83d\uded1 A ' + cutAngle + '\u00b0 cut isn\u2019t a real shot \u2014 at this angle the cue ball can only graze the ball. Use the kick or combo options below, or play safe.\n\n';
+    plainHeadline = '\ud83d\uded1 A ' + cutAngle + '\u00b0 cut isn\u2019t a real shot \u2014 at this angle the cue ball can only graze the ball. ' + _esc + '\n\n';
   else if (_blockedNow)
-    plainHeadline = '\ud83d\uded1 The direct path to this ball is blocked \u2014 there is no clean shot at it. Check the kick or combo option below, or play safe.\n\n';
+    plainHeadline = '\ud83d\uded1 The direct path to this ball is blocked \u2014 there is no clean shot at it. ' + _esc + '\n\n';
   else if (cutAngle !== null && cutAngle >= 75)
-    plainHeadline = '\ud83d\uded1 This cut is about as thin as they come \u2014 very low percentage. Check the kick or combo options below before committing.\n\n';
+    plainHeadline = '\ud83d\uded1 This cut is about as thin as they come \u2014 very low percentage. ' + ((kickNote || comboNote) ? 'Check the kick or combo option below before committing.' : 'Weigh a safety before committing.') + '\n\n';
   else
   if (difficulty <= 3)      plainHeadline = '✅ This is a makeable shot — step in with confidence.\n\n';
   else if (difficulty <= 5) plainHeadline = '⚖️ This is a moderate shot — focus and commit.\n\n';
@@ -9655,6 +9719,26 @@ function suggestShot() {
   /* Unaligned: every angle above came off the photo itself. On a low camera
      that is 25+ degrees out, so say it once, with the way to fix it. */
   syncTrueAnglesBtn(true);
+  /* PAST ANOTHER POCKET. A ball sent along the rail to a corner can run over
+     the side pocket first (4% of crowned shots in rail-heavy random layouts).
+     Rolling dead straight it usually carries; drifting toward the rail it
+     drops - so warn, don't forbid: it may be the only shot on. */
+  if (window._tHf && _scored && !_scored.blocked && cutAngle !== null && cutAngle < 85 && typeof cbPockets === 'function') {
+    try {
+      var _B = geoP(_scored.ball), _P = geoP(_scored.pocket), _mouth = 2.5 / (TABLE_LEN_IN[TABLE_SIZE] || 78);
+      var _vx = _P.fx - _B.fx, _vy = _P.fy - _B.fy, _L2 = _vx * _vx + _vy * _vy;
+      var _past = cbPockets().filter(function (q) {
+        if (Math.hypot(q.fx - _P.fx, q.fy - _P.fy) < 0.01 || !_L2) return false;
+        var t = ((q.fx - _B.fx) * _vx + (q.fy - _B.fy) * _vy) / _L2;
+        return t > 0.02 && t < 0.98 && Math.hypot(_B.fx + t * _vx - q.fx, _B.fy + t * _vy - q.fy) < _mouth;
+      })[0];
+      if (_past) {
+        var _pr = canonToRaw(_past);
+        verdict += '\n\u26a0\ufe0f It runs past the ' + ((_pr && pocketCamName(_pr)) || (_past.corner ? 'corner pocket' : 'side pocket'))
+                + ' \u2014 keep it off the rail or it can drop there.';
+      }
+    } catch (_) {}
+  }
   if (!window._tHf && targetBall && cutAngle !== null)
     verdict += '\n\ud83d\udcd0 Angles are estimated from the photo \u2014 tap \ud83d\udcd0 True angles below.';
   if (cueNote.indexOf('SCRATCH') !== -1) verdict += '\n\u26a0\ufe0f Scratch risk on a ' + (simpleMode ? 'center-ball hit' : 'stun shot') + ' \u2014 see the full read.';
@@ -10908,7 +10992,7 @@ function sbRenderSetup() {
       '</div>' +
       '<div class="sb-rn-btns">' +
         '<button onclick="sbNewMatch()" style="background:#2a1414;color:#ff9d7a;border:1px solid #7a3a2a">NEW MATCH</button>' +
-        '<button onclick="_sbCloseOverlays()" style="background:#0d2e1c;color:#5df0a5;border:1px solid #34c96a">DONE</button>' +
+        '<button onclick="sbSetupDone()" style="background:#0d2e1c;color:#5df0a5;border:1px solid #34c96a">DONE</button>' +
       '</div>' +
     '</div>';
 }
@@ -10919,6 +11003,9 @@ function sbPickGame(k) {
   if (started) sbNewMatch(); else { _sbWinShown = false; saveSettings(); renderScoreboard(); }
   if (!document.getElementById('sb-setup')) openSbSetup(); else sbRenderSetup();
 }
+/* Lowering the race to or below a player's score wins the match - say so
+   when the sheet closes, not on some later, unrelated tap. */
+function sbSetupDone() { _sbCloseOverlays(); sbCheckWin(); }
 function sbStep(dir) {
   var d = sbDef(), t = sbTarget();
   /* points races move in sensible jumps: 100 -> 125 -> 150 for straight pool */
@@ -12355,9 +12442,9 @@ function updateTableBanner() {
   var _nine = (gameMode === '9ball' && !marks.some(function (m) { return m._mustHit; }));
   elA.textContent = _noAng ? (_alt ? 'Nothing goes in the ' + (pocketCamName(top.pocket) || 'pocket you chose') + '. '
                                          + (names[_alt.ball.type] || 'Ball') + ' into the ' + _altWhere + ' does.'
-                                   : 'No ball has an angle into this pocket. Play safe, or check the kick.')
+                                   : ('No ball has an angle into this pocket. ' + ((window._kickShot || window._comboShot) ? 'Play safe, or check the kick.' : 'Play safe.')))
     : _nine ? 'Only if it is the lowest ball on the table \u2014 9-Ball rules.' : top.blocked
-    ? 'No clear path. Check the kick or combo option.'
+    ? ((window._kickShot || window._comboShot) ? 'No clear path. Check the kick or combo option.' : 'No clear path. Play safe.')
     : (d <= 3 ? 'Good shot. Step in with confidence.'
      : d <= 5 ? 'Moderate. Take your time.'
      : d <= 8 ? 'Tough one. Weigh your options.'
@@ -12496,9 +12583,9 @@ function buildSpokenSummary() {
       var alt = window._altShot;
       return alt ? 'Nothing goes in the ' + (pocketCamName(top.pocket) || 'pocket you chose') + '. '
                    + capitalize(names[alt.ball.type] || 'ball') + ' into the ' + (pocketCamName(alt.pocket) || 'other pocket') + ' instead.'
-                 : 'No ball has an angle into this pocket. Play safe, or check the kick.';
+                 : ('No ball has an angle into this pocket. ' + ((window._kickShot || window._comboShot) ? 'Play safe, or check the kick.' : 'Play safe.'));
     }
-    if (top.blocked) return 'The ' + ball + ' is blocked. Check the kick or combo option.';
+    if (top.blocked) return 'The ' + ball + ' is blocked. ' + ((window._kickShot || window._comboShot) ? 'Check the kick or combo option.' : 'Play safe.');
     var where = pocketCamName(top.pocket)
              || (top.pocket ? String(getPocketType(top.pocket).label || 'pocket').toLowerCase() : 'pocket');
     var d = (typeof top.difficulty === 'number') ? top.difficulty : 5;
